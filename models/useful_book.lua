@@ -429,8 +429,8 @@ local GUIS = {
 	end,
 	UB_delete_public_code = function(element, player)
 		local id = tonumber(element.parent.name)
-		admin_script_data[id] = nil
-		compiled_admin_code[id] = nil
+		public_script_data[id] = nil
+		compiled_public_code[id] = nil
 		local flow = element.parent
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
@@ -438,7 +438,7 @@ local GUIS = {
 	UB_delete_admin_code = function(element, player)
 		local id = tonumber(element.parent.name)
 		admin_script_data[id] = nil
-		compiled_public_code[id] = nil
+		compiled_admin_code[id] = nil
 		local flow = element.parent
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
