@@ -321,7 +321,7 @@ local function open_book(player, is_public_data)
 	if is_public_data then
 		fill_with_public_data(scripts_table, player)
 	else
-		fill_with_admin_data(scripts_table, player)
+		fill_with_admin_data(scripts_table)
 	end
 
 	main_frame.force_auto_center()
@@ -331,12 +331,14 @@ local left_anchor = {gui = defines.relative_gui_type.controller_gui, position = 
 local function create_left_relative_gui(player)
 	local relative = player.gui.relative
 	if relative.UB_book then
-		relative.UB_book.destroy()
+		return
 	end
+
 	relative.add{
-		type = "sprite-button", name = "UB_book",
-		sprite = "UB_book", style = "slot_button",
-		tooltip = {"mod-name.useful_book"}, anchor = left_anchor
+		type = "sprite-button",
+		name = "UB_book",
+		style = "UB_book_button", -- see prototypes/style.lua
+		anchor = left_anchor
 	}
 end
 
@@ -363,14 +365,6 @@ local function on_gui_text_changed(event)
 		button = element.parent.parent.buttons_row.UB_add_code
 		button.visible = false
 	end
-end
-
-local function on_player_left_game(event)
-	destroy_GUI(game.get_player(event.player_index))
-end
-
-local function on_player_joined_game(event)
-	destroy_GUI(game.get_player(event.player_index))
 end
 
 local GUIS = {
@@ -647,7 +641,26 @@ M.on_init = function()
 		end'
 	)
 end
-M.on_configuration_changed = update_global_data
+
+M.on_configuration_changed = function(event)
+	update_global_data()
+
+	local mod_changes = event.mod_changes["useful_book"]
+	if not (mod_changes and mod_changes.old_version) then return end
+
+	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
+
+	if version < 0.10 then
+		for _, player in pairs(game.players) do
+			local UB_book = player.gui.relative.UB_book
+			if UB_book then
+				UB_book.destroy()
+			end
+			create_left_relative_gui(player)
+		end
+	end
+end
+
 M.on_load = function()
 	link_data()
 	compile_all_text()
@@ -703,11 +716,13 @@ M.events = {
 	[defines.events.on_gui_text_changed] = function(event)
 		pcall(on_gui_text_changed, event)
 	end,
-	[defines.events.on_player_joined_game] = on_player_joined_game,
-	[defines.events.on_player_left_game] = function(event)
-		pcall(on_player_left_game, event)
-	end,
 	[defines.events.on_player_created] = on_player_created,
+	[defines.events.on_player_joined_game] = function(event)
+		destroy_GUI(game.get_player(event.player_index))
+	end,
+	[defines.events.on_player_left_game] = function(event)
+		pcall(destroy_GUI, game.get_player(event.player_index))
+	end,
 	[defines.events.on_player_demoted] = function(event)
 		pcall(destroy_GUI, game.get_player(event.player_index))
 	end

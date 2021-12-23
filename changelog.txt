@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.10.0
+Date: 23. 12. 2021
+  Changes:
+    - Remade the button fully at data stage (adds full customization for other mods)
+    - Refactored slightly
+---------------------------------------------------------------------------------------------------
 Version: 0.9.2
 Date: 22. 12. 2021
   Changes:
