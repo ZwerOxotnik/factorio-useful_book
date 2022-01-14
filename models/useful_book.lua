@@ -613,8 +613,18 @@ M.on_init = function()
 		{"scripts-titles.kill-all-enemies"},
 		{"scripts-description.kill-all-enemies"},
 		'local player = ...\
-		for key, entity in pairs(player.surface.find_entities_filtered({force="enemy"})) do\
-			entity.destroy()\
+		local entities = player.surface.find_entities_filtered({force="enemy"})\
+		for i=1, #entities do\
+			entities[i].destroy()\
+		end'
+	)
+	add_admin_script(
+		{"scripts-titles.kill-half-enemies"},
+		{"scripts-description.kill-half-enemies"},
+		'local player = ...\
+		local entities = player.surface.find_entities_filtered({force="enemy"})\
+		for i=1, #entities, 2 do\
+			entities[i].destroy()\
 		end'
 	)
 	add_admin_script(
@@ -622,7 +632,9 @@ M.on_init = function()
 		{"scripts-description.reg-resources"},
 		'local player = ...\n\
 		local surface = player.surface\
-		for _, e in pairs(surface.find_entities_filtered{type="resource"}) do\
+		local entities = surface.find_entities_filtered{type="resource"}\
+		for i=1, #entities do\
+			local e = entities[i]\
 			if e.prototype.infinite_resource then\
 				e.amount = e.initial_amount\
 			else\
@@ -632,12 +644,13 @@ M.on_init = function()
 		local non_infinites = {}\
 		for resource, prototype in pairs(game.get_filtered_entity_prototypes{{filter="type", type="resource"}}) do\
 			if not prototype.infinite_resource then\
-				table.insert(non_infinites, resource)\
+				non_infinites[#non_infinites+1] = resource\
 			end\
 		end\
 		surface.regenerate_entity(non_infinites)\
-		for _, e in pairs(surface.find_entities_filtered{type="mining-drill"}) do\
-				e.update_connections()\
+		entities = surface.find_entities_filtered{type="mining-drill"}\
+		for i=1, #entities do\
+			entities[i].update_connections()\
 		end'
 	)
 end
@@ -649,6 +662,18 @@ M.on_configuration_changed = function(event)
 	if not (mod_changes and mod_changes.old_version) then return end
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
+
+	if version < 0.11 then
+		add_admin_script(
+			{"scripts-titles.kill-half-enemies"},
+			{"scripts-description.kill-half-enemies"},
+			'local player = ...\
+			local entities = player.surface.find_entities_filtered({force="enemy"})\
+			for i=1, #entities, 2 do\
+				entities[i].destroy()\
+			end'
+		)
+	end
 
 	if version < 0.10 then
 		for _, player in pairs(game.players) do
