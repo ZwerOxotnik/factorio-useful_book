@@ -4,7 +4,6 @@
 		{
 			"label": "zip mod",
 			"type": "shell",
-			"problemMatcher": [],
 			"command": "bash",
 			"args": [".scripts/zip_mod.sh"],
 			"group": "build",
@@ -13,12 +12,11 @@
 			}
 		},
 		{
-			"label": "Handle sounds",
+			"label": "Luacheck",
 			"type": "shell",
-			"problemMatcher": [],
-			"command": "bash",
-			"args": [".scripts/handle_sounds.sh"],
-			"group": "build"
+			"command": "luacheck",
+			"args": ["${file}"],
+			"group": "test"
 		}
 	]
 }

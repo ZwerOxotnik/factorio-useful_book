@@ -4,6 +4,9 @@
 	"lua.targetVersion": "5.2",
 	"Lua.runtime.version": "Lua 5.2",
 	"Lua.workspace.preloadFileSize": 1600,
+	"files.associations": {
+		"*.can": "lua"
+	},
 	"Lua.diagnostics.globals": [
 		"game",
 		"script",
@@ -72,4 +75,7 @@
 		"undefined-doc-name",
 		"undefined-doc-class"
 	],
+	"triggerTaskOnSave.tasks": {
+		"Luacheck": ["*.lua"]
+	}
 }
