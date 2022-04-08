@@ -3,15 +3,16 @@ local M = {}
 
 --#region Global data
 local mod_data
----@type table <number, function>
-local compiled_public_code = {}
----@type table <number, function>
-local compiled_admin_code = {}
 ---@type table <number, table>
 local public_script_data
 ---@type table <number, table>
 local admin_script_data
 --#endregion
+
+---@type table <number, function>
+local compiled_public_code = {}
+---@type table <number, function>
+local compiled_admin_code = {}
 
 
 --#region Constants
@@ -19,6 +20,7 @@ local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
 local FLOW = {type = "flow"}
 local EMPTY_WIDGET = {type = "empty-widget"}
 local RED_COLOR = {1, 0, 0}
+local print_to_rcon = rcon.print
 --#endregion
 
 
@@ -28,13 +30,117 @@ if script.mod_name ~= "useful_book" then
 end
 
 
+--#region Function for RCON
+
+---@param name string
+function getRconData(name)
+	print_to_rcon(game.table_to_json(mod_data[name]))
+end
+
+--#endregion
+
+
 --#region utils
+
+---@param json string
+---@param player? LuaPlayer
+function import_scripts(json, player)
+	-- TODO: improve (check erros)
+	local raw_data = game.json_to_table(json)
+	if raw_data.public then
+		for _, data in pairs(raw_data.public) do
+			add_public_script(data.title, data.descripton, data.code)
+		end
+	end
+	if raw_data.admin then
+		for _, data in pairs(raw_data.admin) do
+			add_admin_script(data.title, data.descripton, data.code)
+		end
+	end
+
+	local target = player or game
+	-- TODO: add localization
+	target.print("Scripts has been imported for \"useful book\"")
+end
+
+function reset_scripts()
+	mod_data.admin_script_data = {}
+	admin_script_data = mod_data.admin_script_data
+	mod_data.public_script_data = {}
+	public_script_data = mod_data.public_script_data
+	ompiled_admin_code = {}
+	compiled_public_code = {}
+	add_admin_script(
+		{"scripts-titles.reveal-gen-map"},
+		{"scripts-description.reveal-gen-map"},
+		"local player = ...\nplayer.force.chart_all()"
+	)
+	add_admin_script(
+		{"scripts-titles.kill-all-enemies"},
+		{"scripts-description.kill-all-enemies"},
+		'local player = ...\
+		local entities = player.surface.find_entities_filtered({force="enemy"})\
+		for i=1, #entities do\
+			entities[i].destroy()\
+		end'
+	)
+	add_admin_script(
+		{"scripts-titles.kill-half-enemies"},
+		{"scripts-description.kill-half-enemies"},
+		'local player = ...\
+		local entities = player.surface.find_entities_filtered({force="enemy"})\
+		for i=1, #entities, 2 do\
+			entities[i].destroy()\
+		end'
+	)
+	add_admin_script(
+		{"scripts-titles.reg-resources"},
+		{"scripts-description.reg-resources"},
+		'local player = ...\n\
+		local surface = player.surface\
+		local entities = surface.find_entities_filtered{type="resource"}\
+		for i=1, #entities do\
+			local e = entities[i]\
+			if e.prototype.infinite_resource then\
+				e.amount = e.initial_amount\
+			else\
+				e.destroy()\
+			end\
+		end\
+		local non_infinites = {}\
+		for resource, prototype in pairs(game.get_filtered_entity_prototypes{{filter="type", type="resource"}}) do\
+			if not prototype.infinite_resource then\
+				non_infinites[#non_infinites+1] = resource\
+			end\
+		end\
+		surface.regenerate_entity(non_infinites)\
+		entities = surface.find_entities_filtered{type="mining-drill"}\
+		for i=1, #entities do\
+			entities[i].update_connections()\
+		end'
+	)
+
+	for _, player in pairs(game.players) do
+		if player.valid and player.admin then
+			-- TODO: add localization
+			player.print("Scripts has been reset for \"useful book\"")
+		end
+	end
+end
+
+-- Replaces tabulation with 2 spaces and removes unnecessary spaces
+---@param code string
+---@return string #code
+function format_code(code)
+	return code:gsub("[ ]+\n", "\n"):gsub("\t", "  ")
+end
 
 ---@param title string|LocalisedString
 ---@param description? string
 ---@param code string
 ---@return number? #id
-local function add_admin_script(title, description, code)
+function add_admin_script(title, description, code)
+	code = format_code(code)
 	local f = load(code)
 	if type(f) == "function" then
 		local id = mod_data.last_admin_id + 1
@@ -53,7 +159,8 @@ end
 ---@param description? string
 ---@param code string
 ---@return number? #id
-local function add_public_script(title, description, code)
+function add_public_script(title, description, code)
+	code = format_code(code)
 	local f = load(code)
 	if type(f) == "function" then
 		local id = mod_data.last_public_id + 1
@@ -68,7 +175,10 @@ local function add_public_script(title, description, code)
 	end
 end
 
-local function destroy_GUI(player)
+local function destroy_GUI_event(event)
+	local player = game.get_player(event.player_index)
+	if not (player and player.valid) then return end
+
 	local screen = player.gui.screen
 	if screen.UB_book_frame then
 		screen.UB_book_frame.destroy()
@@ -81,7 +191,7 @@ end
 ---@param player PlayerIdentification
 ---@param is_public_code boolean
 ---@param id? number
-local function open_code_editor(player, is_public_code, id)
+function open_code_editor(player, is_public_code, id)
 	local screen = player.gui.screen
 	if screen.UB_code_editor then
 		screen.UB_code_editor.destroy()
@@ -250,7 +360,7 @@ end
 
 ---@param player PlayerIdentification
 ---@param is_public_data boolean
-local function open_book(player, is_public_data)
+function switch_book(player, is_public_data)
 	local screen = player.gui.screen
 	if screen.UB_book_frame then
 		screen.UB_book_frame.destroy()
@@ -258,7 +368,7 @@ local function open_book(player, is_public_data)
 
 	local main_frame = screen.add{type = "frame", name = "UB_book_frame", direction = "vertical"}
 	main_frame.style.minimal_width = 260
-	local flow = main_frame.add{type = "flow"}
+	local flow = main_frame.add(FLOW)
 	flow.add{
 		type = "label",
 		style = "frame_title",
@@ -354,6 +464,7 @@ end
 
 local function on_gui_text_changed(event)
 	local element = event.element
+	if not (element and element.valid) then return end
 	if element.name ~= "UB_program_input" then return end
 
 	local button = element.parent.parent.buttons_row.UB_run_code
@@ -376,7 +487,7 @@ local GUIS = {
 			if event.control then
 				open_code_editor(player, not event.shift)
 			else
-				open_book(player, not event.shift)
+				switch_book(player, not event.shift)
 			end
 		else
 			local UB_book_frame = player.gui.screen.UB_book_frame
@@ -386,7 +497,7 @@ local GUIS = {
 				if next(public_script_data) == nil then
 					player.print({"useful_book.no-public-scripts"})
 				else
-					open_book(player, true)
+					switch_book(player, true)
 				end
 			end
 		end
@@ -395,7 +506,7 @@ local GUIS = {
 		local id = tonumber(element.parent.name)
 		local f = compiled_public_code[id]
 		if f then
-			local is_ok, error = pcall(load(public_script_data[id].code), player)
+			local is_ok, error = pcall(f, player)
 			if not is_ok then
 				player.print(error, RED_COLOR)
 			end
@@ -410,7 +521,7 @@ local GUIS = {
 		local id = tonumber(element.parent.name)
 		local f = compiled_admin_code[id]
 		if f then
-			local is_ok, error = pcall(load(admin_script_data[id].code), player)
+			local is_ok, error = pcall(f, player)
 			if not is_ok then
 				player.print(error, RED_COLOR)
 			end
@@ -511,7 +622,7 @@ local GUIS = {
 			end
 		end
 		element.parent.parent.destroy()
-		open_book(player, is_public_code)
+		switch_book(player, is_public_code)
 	end,
 	UB_run_code = function(element, player)
 		local is_ok, error = pcall(load(element.parent.parent.scroll_pane.UB_program_input.text), player)
@@ -549,16 +660,21 @@ local GUIS = {
 		local table_element = element.parent.parent
 		if table_element.name == "admin_cover" then
 			table_element.parent.destroy()
-			open_book(player, true)
+			switch_book(player, true)
 		else
 			table_element.parent.destroy()
-			open_book(player, false)
+			switch_book(player, false)
 		end
 	end
 }
 local function on_gui_click(event)
-	local f = GUIS[event.element.name]
-	if f then f(event.element, game.get_player(event.player_index), event) end
+	local element = event.element
+	if not (element and element.valid) then return end
+
+	local f = GUIS[element.name]
+	if f then
+		f(element, game.get_player(event.player_index), event)
+	end
 end
 
 --#endregion
@@ -604,55 +720,12 @@ end
 
 M.on_init = function()
 	update_global_data()
-	add_admin_script(
-		{"scripts-titles.reveal-gen-map"},
-		{"scripts-description.reveal-gen-map"},
-		"local player = ...\nplayer.force.chart_all()"
-	)
-	add_admin_script(
-		{"scripts-titles.kill-all-enemies"},
-		{"scripts-description.kill-all-enemies"},
-		'local player = ...\
-		local entities = player.surface.find_entities_filtered({force="enemy"})\
-		for i=1, #entities do\
-			entities[i].destroy()\
-		end'
-	)
-	add_admin_script(
-		{"scripts-titles.kill-half-enemies"},
-		{"scripts-description.kill-half-enemies"},
-		'local player = ...\
-		local entities = player.surface.find_entities_filtered({force="enemy"})\
-		for i=1, #entities, 2 do\
-			entities[i].destroy()\
-		end'
-	)
-	add_admin_script(
-		{"scripts-titles.reg-resources"},
-		{"scripts-description.reg-resources"},
-		'local player = ...\n\
-		local surface = player.surface\
-		local entities = surface.find_entities_filtered{type="resource"}\
-		for i=1, #entities do\
-			local e = entities[i]\
-			if e.prototype.infinite_resource then\
-				e.amount = e.initial_amount\
-			else\
-				e.destroy()\
-			end\
-		end\
-		local non_infinites = {}\
-		for resource, prototype in pairs(game.get_filtered_entity_prototypes{{filter="type", type="resource"}}) do\
-			if not prototype.infinite_resource then\
-				non_infinites[#non_infinites+1] = resource\
-			end\
-		end\
-		surface.regenerate_entity(non_infinites)\
-		entities = surface.find_entities_filtered{type="mining-drill"}\
-		for i=1, #entities do\
-			entities[i].update_connections()\
-		end'
-	)
+	local UB_json_data = settings.global.UB_json_data.value
+	if UB_json_data == '' then
+		reset_scripts()
+	else
+		import_scripts(UB_json_data)
+	end
 end
 
 M.on_configuration_changed = function(event)
@@ -700,32 +773,31 @@ M.add_remote_interface = function()
 		get_mod_data = function()
 			return mod_data
 		end,
+		reset_scripts = reset_scripts,
 		delete_admin_script = function(id)
 			admin_script_data[id] = nil
-			compiled_admin_code = nil
+			compiled_admin_code[id] = nil
 		end,
 		delete_public_script = function(id)
 			public_script_data[id] = nil
-			compiled_public_code = nil
+			compiled_public_code[id] = nil
 		end,
 		add_admin_script = add_admin_script,
 		add_public_script = add_public_script,
 		run_admin_script = function(id, player)
 			local f = compiled_public_code[id]
-			if f then
-				local is_ok, error = pcall(load(admin_script_data[id].code), player)
-				if not is_ok then
-					player.print(error, RED_COLOR)
-				end
+			if f == nil then return end
+			local is_ok, error = pcall(f, player)
+			if not is_ok then
+				player.print(error, RED_COLOR)
 			end
 		end,
 		run_public_script = function(id, player)
 			local f = compiled_public_code[id]
-			if f then
-				local is_ok, error = pcall(load(public_script_data[id].code), player)
-				if not is_ok then
-					player.print(error, RED_COLOR)
-				end
+			if f == nil then return end
+			local is_ok, error = pcall(f, player)
+			if not is_ok then
+				player.print(error, RED_COLOR)
 			end
 		end
 	})
@@ -735,22 +807,41 @@ end
 
 
 M.events = {
-	[defines.events.on_gui_click] = function(event)
-		pcall(on_gui_click, event)
-	end,
-	[defines.events.on_gui_text_changed] = function(event)
-		pcall(on_gui_text_changed, event)
-	end,
+	[defines.events.on_gui_click] = on_gui_click,
+	[defines.events.on_gui_text_changed] = on_gui_text_changed,
 	[defines.events.on_player_created] = on_player_created,
-	[defines.events.on_player_joined_game] = function(event)
-		destroy_GUI(game.get_player(event.player_index))
+	[defines.events.on_player_joined_game] = destroy_GUI_event,
+	[defines.events.on_player_left_game] = destroy_GUI_event,
+	[defines.events.on_player_demoted] = destroy_GUI_event
+}
+
+M.commands = {
+	["Ubook-export"] = function(cmd)
+		local raw_data = {
+			public = {},
+			admin = {}
+		}
+
+
+		local public_data = raw_data.public
+		local admin_data = raw_data.admin
+		for _, data in pairs(public_script_data) do
+			public_data[#public_data+1] = data
+		end
+		for _, data in pairs(admin_script_data) do
+			admin_data[#admin_data+1] = data
+		end
+
+		local json = game.table_to_json(raw_data)
+		game.write_file("useful_book_scripts.json", json, false, cmd.player_index)
+		local target = game.get_player(cmd.player_index) or game
+		-- TODO: add localization
+		target.print("Json data has been exported on in ...script-output/useful_book_scripts.json")
 	end,
-	[defines.events.on_player_left_game] = function(event)
-		pcall(destroy_GUI, game.get_player(event.player_index))
+	["Ubook-import"] = function(cmd)
+		import_scripts(cmd.parameter, game.get_player(cmd.player_index))
 	end,
-	[defines.events.on_player_demoted] = function(event)
-		pcall(destroy_GUI, game.get_player(event.player_index))
-	end
+	["Ubook-reset"] = reset_scripts,
 }
 
 return M

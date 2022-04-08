@@ -1,10 +1,11 @@
 ---@type table<string, module>
 local modules = {}
-modules["useful_book"] = require("models/useful_book")
-local module = modules["useful_book"]
+modules.better_commands = require("models/BetterCommands/control")
+modules.useful_book = require("models/useful_book")
 
 if remote.interfaces["disable-useful_book"] then
-	module.events = nil
+	local module = modules["useful_book"]
+	modules.useful_book.events = nil
 	module.on_nth_tick = nil
 	module.commands = nil
 	module.on_load = nil
@@ -18,4 +19,7 @@ if script.active_mods["zk-lib"] then
 else
 	event_handler = require("event_handler")
 end
+
+modules.better_commands:handle_custom_commands(modules.useful_book) -- adds commands
+
 event_handler.add_libraries(modules)

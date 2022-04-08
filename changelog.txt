@@ -1,4 +1,21 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.12.0
+Date: 08. 04. 2022
+  Features:
+    - Added import and exports of scripts + setting
+    - Added new commands: /Ubook-export /Ubook-import /Ubook-reset
+  Changes:
+    - 2 spaces instead of tabulation
+    - No more unnecessary spaces in the code
+    - Slightly improved events
+  Bugfixes:
+    - It's safe to remove scripts via the remote interface now
+  Scripting:
+    - Added "reset_scripts" in the remote interface
+    - Some functions are global now
+    - Added function for RCON:
+    -   /sc __iFreeMarket__ getRconData("name of data")
+---------------------------------------------------------------------------------------------------
 Version: 0.11.0
 Date: 14. 01. 2022
   Changes:
