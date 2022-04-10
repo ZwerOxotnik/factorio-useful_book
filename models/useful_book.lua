@@ -16,11 +16,19 @@ local compiled_admin_code = {}
 
 
 --#region Constants
+local print_to_rcon = rcon.print
 local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
 local FLOW = {type = "flow"}
 local EMPTY_WIDGET = {type = "empty-widget"}
 local RED_COLOR = {1, 0, 0}
-local print_to_rcon = rcon.print
+local CLOSE_BUTTON = {
+	type = "sprite-button",
+	name = "UB_close",
+	style = "frame_action_button",
+	sprite = "utility/close_white",
+	hovered_sprite = "utility/close_black",
+	clicked_sprite = "utility/close_black"
+}
 --#endregion
 
 
@@ -98,14 +106,7 @@ function open_import_frame(_, player)
 	drag_handler.style.right_margin = 0
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
-	footer.add{
-		type = "sprite-button",
-		name = "UB_close",
-		style = "frame_action_button",
-		sprite = "utility/close_white",
-		hovered_sprite = "utility/close_black",
-		clicked_sprite = "utility/close_black"
-	}
+	footer.add(CLOSE_BUTTON)
 
 	local textfield = main_frame.add{
 		type = "text-box",
@@ -292,14 +293,7 @@ function open_code_editor(player, is_public_code, id)
 	drag_handler.style.right_margin = 0
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
-	footer.add{
-		type = "sprite-button",
-		name = "UB_close",
-		style = "frame_action_button",
-		sprite = "utility/close_white",
-		hovered_sprite = "utility/close_black",
-		clicked_sprite = "utility/close_black"
-	}
+	footer.add(CLOSE_BUTTON)
 
 	local flow = main_frame.add(FLOW)
 	flow.name = "buttons_row"
@@ -453,6 +447,13 @@ function switch_book(player, is_public_data)
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
 	if player.admin then
+		local button = footer.add{
+			type = "sprite-button",
+			name = "UB_open_import",
+			sprite = "utility/import", -- TODO: add white button
+			tooltip = {"gui-blueprint-library.import-string"},
+			style = "frame_action_button"
+		}
 		footer.add{
 			type = "sprite-button",
 			name = "UB_open_code_editor",
@@ -461,22 +462,8 @@ function switch_book(player, is_public_data)
 			hovered_sprite = "plus",
 			clicked_sprite = "plus"
 		}
-		footer.add{
-			type = "sprite-button",
-			name = "UB_open_import",
-			sprite = "utility/import",
-			tooltip = {"gui-blueprint-library.import-string"},
-			style = "tool_button"
-		}
 	end
-	footer.add{
-		type = "sprite-button",
-		name = "UB_close",
-		style = "frame_action_button",
-		sprite = "utility/close_white",
-		hovered_sprite = "utility/close_black",
-		clicked_sprite = "utility/close_black"
-	}
+	footer.add(CLOSE_BUTTON)
 
 	local title_table = main_frame.add{type = "table", column_count = 3}
 	title_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
@@ -929,6 +916,9 @@ M.commands = {
 		local target = game.get_player(cmd.player_index) or game
 		-- TODO: add localization
 		target.print("Json data has been exported in ...script-output/useful_book_scripts.json")
+	end,
+	["Ubook-import"] = function(cmd)
+		import_scripts(cmd.parameter, game.get_player(cmd.player_index))
 	end,
 	["Ubook-reset"] = reset_scripts,
 }

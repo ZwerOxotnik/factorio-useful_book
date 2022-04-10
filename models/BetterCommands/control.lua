@@ -7,7 +7,6 @@ local M = {}
 ---@type table<string, table>
 local all_commands = {} -- commands from other modules
 
-local MAX_INPUT_LENGTH = 500 -- set any number
 local CONST_COMMANDS = require("__useful_book__/const-commands")
 local SWITCHABLE_COMMANDS = require("__useful_book__/switchable-commands")
 
@@ -116,9 +115,6 @@ local function add_custom_command(orig_command_name, command_settings, original_
 				print_to_caller({"", '/' .. command_name .. ' ', command_description}, cmd.player_index)
 				return
 			end
-		elseif #cmd.parameter > MAX_INPUT_LENGTH then
-			print_to_caller({"", {"description.maximum-length", '=', MAX_INPUT_LENGTH}}, cmd.player_index)
-			return
 		end
 
 		if cmd.parameter and input_type then
