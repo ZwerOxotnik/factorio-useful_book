@@ -44,9 +44,17 @@ end
 
 ---@param json string
 ---@param player? LuaPlayer
+---@return boolean
 function import_scripts(json, player)
-	-- TODO: improve (check erros)
+	local target = player or game
+
 	local raw_data = game.json_to_table(json)
+	if raw_data == nil then
+		-- TODO: add localization
+		target.print("It's not json data")
+		return false
+	end
+
 	if raw_data.public then
 		for _, data in pairs(raw_data.public) do
 			add_public_script(data.title, data.descripton, data.code)
@@ -58,9 +66,67 @@ function import_scripts(json, player)
 		end
 	end
 
-	local target = player or game
 	-- TODO: add localization
 	target.print("Scripts has been imported for \"useful book\"")
+	return true
+end
+
+---@param _ nil
+---@param player LuaPlayer
+function open_import_frame(_, player)
+	local screen = player.gui.screen
+	if screen.UB_import_frame then
+		return
+	end
+
+	local main_frame = screen.add{
+		type = "frame",
+		name = "UB_import_frame",
+		direction = "vertical"
+	}
+	main_frame.auto_center = true
+
+	local footer = main_frame.add(FLOW)
+	footer.add{
+		type = "label",
+		style = "frame_title",
+		caption = {"gui-blueprint-library.import-string"},
+		ignored_by_interaction = true
+	}
+	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
+	drag_handler.drag_target = main_frame
+	drag_handler.style.right_margin = 0
+	drag_handler.style.horizontally_stretchable = true
+	drag_handler.style.height = 32
+	footer.add{
+		type = "sprite-button",
+		name = "UB_close",
+		style = "frame_action_button",
+		sprite = "utility/close_white",
+		hovered_sprite = "utility/close_black",
+		clicked_sprite = "utility/close_black"
+	}
+
+	local textfield = main_frame.add{
+		type = "text-box",
+		name = "UB_text_for_import",
+		style = "UB_program_input"
+	}
+	textfield.word_wrap = true
+	textfield.style.height = player.display_resolution.height * 0.6 / player.display_scale
+	textfield.style.width = player.display_resolution.width * 0.6 / player.display_scale
+	local flow = main_frame.add{type = "flow", direction = "horizontal", style = "dialog_buttons_horizontal_flow"}
+	local pusher = flow.add{type = "empty-widget", style = "draggable_space"}
+	pusher.style.horizontally_stretchable = true
+	pusher.style.vertically_stretchable = true
+	pusher.drag_target = main_frame
+	local confirm_button = flow.add{
+		type = "button",
+		name = "UB_import",
+		caption = {"gui-blueprint-library.import"},
+		style = "confirm_button"
+	}
+	confirm_button.style.minimal_width = 250
 end
 
 function reset_scripts()
@@ -189,6 +255,9 @@ local function destroy_GUI_event(event)
 	if screen.UB_code_editor then
 		screen.UB_code_editor.destroy()
 	end
+	if screen.UB_import_frame then
+		screen.UB_import_frame.destroy()
+	end
 end
 
 ---@param player PlayerIdentification
@@ -211,19 +280,19 @@ function open_code_editor(player, is_public_code, id)
 	end
 
 	local main_frame = screen.add{type = "frame", name = "UB_code_editor", direction = "vertical"}
-	local flow = main_frame.add(FLOW)
-	flow.add{
+	local footer = main_frame.add(FLOW)
+	footer.add{
 		type = "label",
 		style = "frame_title",
 		caption = {"useful_book.code_editor"},
 		ignored_by_interaction = true
 	}
-	local drag_handler = flow.add{type = "empty-widget", style = "draggable_space"}
+	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
 	drag_handler.drag_target = main_frame
 	drag_handler.style.right_margin = 0
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
-	flow.add{
+	footer.add{
 		type = "sprite-button",
 		name = "UB_close",
 		style = "frame_action_button",
@@ -232,7 +301,7 @@ function open_code_editor(player, is_public_code, id)
 		clicked_sprite = "utility/close_black"
 	}
 
-	flow = main_frame.add(FLOW)
+	local flow = main_frame.add(FLOW)
 	flow.name = "buttons_row"
 	local content = {type = "sprite-button"}
 	content.name = "UB_check_code"
@@ -371,20 +440,20 @@ function switch_book(player, is_public_data)
 
 	local main_frame = screen.add{type = "frame", name = "UB_book_frame", direction = "vertical"}
 	main_frame.style.minimal_width = 260
-	local flow = main_frame.add(FLOW)
-	flow.add{
+	local footer = main_frame.add(FLOW)
+	footer.add{
 		type = "label",
 		style = "frame_title",
 		caption = {"mod-name.useful_book"},
 		ignored_by_interaction = true
 	}
-	local drag_handler = flow.add{type = "empty-widget", style = "draggable_space"}
+	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
 	drag_handler.drag_target = main_frame
 	drag_handler.style.right_margin = 0
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
 	if player.admin then
-		flow.add{
+		footer.add{
 			type = "sprite-button",
 			name = "UB_open_code_editor",
 			style = "frame_action_button",
@@ -392,8 +461,15 @@ function switch_book(player, is_public_data)
 			hovered_sprite = "plus",
 			clicked_sprite = "plus"
 		}
+		footer.add{
+			type = "sprite-button",
+			name = "UB_open_import",
+			sprite = "utility/import",
+			tooltip = {"gui-blueprint-library.import-string"},
+			style = "tool_button"
+		}
 	end
-	flow.add{
+	footer.add{
 		type = "sprite-button",
 		name = "UB_close",
 		style = "frame_action_button",
@@ -668,7 +744,20 @@ local GUIS = {
 			table_element.parent.destroy()
 			switch_book(player, false)
 		end
-	end
+	end,
+	UB_import = function(element, player)
+		local UB_import_frame = element.parent.parent
+		if not player.admin then
+			-- TODO: add message
+			UB_import_frame.destroy()
+			return
+		end
+
+		if import_scripts(UB_import_frame.UB_text_for_import.text, player) then
+			UB_import_frame.destroy()
+		end
+	end,
+	UB_open_import = open_import_frame
 }
 local function on_gui_click(event)
 	local element = event.element
@@ -816,7 +905,7 @@ M.events = {
 	[defines.events.on_player_created] = on_player_created,
 	[defines.events.on_player_joined_game] = destroy_GUI_event,
 	[defines.events.on_player_left_game] = destroy_GUI_event,
-	[defines.events.on_player_demoted] = destroy_GUI_event
+	[defines.events.on_player_demoted] = destroy_GUI_event,
 }
 
 M.commands = {
@@ -825,7 +914,6 @@ M.commands = {
 			public = {},
 			admin = {}
 		}
-
 
 		local public_data = raw_data.public
 		local admin_data = raw_data.admin
@@ -840,10 +928,7 @@ M.commands = {
 		game.write_file("useful_book_scripts.json", json, false, cmd.player_index)
 		local target = game.get_player(cmd.player_index) or game
 		-- TODO: add localization
-		target.print("Json data has been exported on in ...script-output/useful_book_scripts.json")
-	end,
-	["Ubook-import"] = function(cmd)
-		import_scripts(cmd.parameter, game.get_player(cmd.player_index))
+		target.print("Json data has been exported in ...script-output/useful_book_scripts.json")
 	end,
 	["Ubook-reset"] = reset_scripts,
 }

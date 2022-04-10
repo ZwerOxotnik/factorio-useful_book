@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.13.0
+Date: 10. 04. 2022
+  Features:
+    - Added import UI to avoid some Factorio limitation (removed /Ubook-import command)
+  Translation:
+    - Changed description of commands
+---------------------------------------------------------------------------------------------------
 Version: 0.12.1
 Date: 10. 04. 2022
   Bugfixes:
