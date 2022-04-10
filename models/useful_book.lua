@@ -79,18 +79,20 @@ function reset_scripts()
 		{"scripts-titles.kill-all-enemies"},
 		{"scripts-description.kill-all-enemies"},
 		'local player = ...\
+		local raise_destroy = {raise_destroy=true}\
 		local entities = player.surface.find_entities_filtered({force="enemy"})\
 		for i=1, #entities do\
-			entities[i].destroy()\
+			entities[i].destroy(raise_destroy)\
 		end'
 	)
 	add_admin_script(
 		{"scripts-titles.kill-half-enemies"},
 		{"scripts-description.kill-half-enemies"},
 		'local player = ...\
+		local raise_destroy = {raise_destroy=true}\
 		local entities = player.surface.find_entities_filtered({force="enemy"})\
 		for i=1, #entities, 2 do\
-			entities[i].destroy()\
+			entities[i].destroy(raise_destroy)\
 		end'
 	)
 	add_admin_script(
@@ -98,13 +100,14 @@ function reset_scripts()
 		{"scripts-description.reg-resources"},
 		'local player = ...\n\
 		local surface = player.surface\
+		local raise_destroy = {raise_destroy=true}\
 		local entities = surface.find_entities_filtered{type="resource"}\
 		for i=1, #entities do\
 			local e = entities[i]\
 			if e.prototype.infinite_resource then\
 				e.amount = e.initial_amount\
 			else\
-				e.destroy()\
+				e.destroy(raise_destroy)\
 			end\
 		end\
 		local non_infinites = {}\
@@ -741,9 +744,10 @@ M.on_configuration_changed = function(event)
 			{"scripts-titles.kill-half-enemies"},
 			{"scripts-description.kill-half-enemies"},
 			'local player = ...\
+			local raise_destroy = {raise_destroy=true}\
 			local entities = player.surface.find_entities_filtered({force="enemy"})\
 			for i=1, #entities, 2 do\
-				entities[i].destroy()\
+				entities[i].destroy(raise_destroy)\
 			end'
 		)
 	end
