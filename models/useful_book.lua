@@ -3,22 +3,28 @@ local M = {}
 
 --#region Global data
 local mod_data
----@type table <number, table>
+---@type table<integer, table>
 local public_script_data
----@type table <number, table>
+---@type table<integer, table>
 local admin_script_data
+---@type table<string, table>
+local rcon_script_data
 --#endregion
 
----@type table <number, function>
+---@type table<integer, function>
 local compiled_public_code = {}
----@type table <number, function>
+---@type table<integer, function>
 local compiled_admin_code = {}
+---@type table<string, function>
+local compiled_rcon_code = {}
 
 
 --#region Constants
 local print_to_rcon = rcon.print
 local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
+local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nrcon.print(game.table_to_json(global.my_data))"
 local FLOW = {type = "flow"}
+local LABEL = {type = "label"}
 local EMPTY_WIDGET = {type = "empty-widget"}
 local RED_COLOR = {1, 0, 0}
 local CLOSE_BUTTON = {
@@ -28,6 +34,16 @@ local CLOSE_BUTTON = {
 	sprite = "utility/close_white",
 	hovered_sprite = "utility/close_black",
 	clicked_sprite = "utility/close_black"
+}
+local BOOK_TYPES = {
+	admin = 1,
+	public = 2,
+	rcon = 3
+}
+local BOOK_TITLES = {
+	[BOOK_TYPES.admin] = {"useful_book.admin_scripts"},
+	[BOOK_TYPES.public] = {"useful_book.public_scripts"},
+	[BOOK_TYPES.rcon] = {"useful_book.rcon_scripts"},
 }
 --#endregion
 
@@ -40,9 +56,22 @@ end
 
 --#region Function for RCON
 
+-- /sc __useful_book__ getRconData("name")
 ---@param name string
 function getRconData(name)
 	print_to_rcon(game.table_to_json(mod_data[name]))
+end
+
+-- /sc __useful_book__ RunRCONScript("script name", ...)
+---@param name string
+---@param ... any #any data
+function RunRCONScript(name, ...)
+	local f = compiled_rcon_code[name]
+	if f == nil then return end
+	local is_ok, error = pcall(f, ...)
+	if not is_ok then
+		game.print(error, RED_COLOR)
+	end
 end
 
 --#endregion
@@ -50,8 +79,9 @@ end
 
 --#region utils
 
+
 ---@param json string
----@param player? LuaPlayer
+---@param player? table #LuaPlayer
 ---@return boolean
 function import_scripts(json, player)
 	local target = player or game
@@ -73,14 +103,20 @@ function import_scripts(json, player)
 			add_admin_script(data.title, data.descripton, data.code)
 		end
 	end
+	if raw_data.rcon then
+		for name, data in pairs(raw_data.rcon) do
+			add_rcon_script(name, data.descripton, data.code)
+		end
+	end
 
 	-- TODO: add localization
 	target.print("Scripts has been imported for \"useful book\"")
 	return true
 end
 
+
 ---@param _ nil
----@param player LuaPlayer
+---@param player table #LuaPlayer
 function open_import_frame(_, player)
 	local screen = player.gui.screen
 	if screen.UB_import_frame then
@@ -135,8 +171,11 @@ function reset_scripts()
 	admin_script_data = mod_data.admin_script_data
 	mod_data.public_script_data = {}
 	public_script_data = mod_data.public_script_data
+	mod_data.rcon_script_data = {}
+	rcon_script_data = mod_data.rcon_script_data
 	ompiled_admin_code = {}
 	compiled_public_code = {}
+	compiled_rcon_code = {}
 	add_admin_script(
 		{"scripts-titles.reveal-gen-map"},
 		{"scripts-description.reveal-gen-map"},
@@ -189,7 +228,11 @@ function reset_scripts()
 			entities[i].update_connections()\
 		end'
 	)
-
+	add_rcon_script(
+		"Print Twitch message", "",
+		'local username, message = ...\
+		game.print({"", "[Twitch] ", username, {"COLON"}, " ", message})'
+	)
 	for _, player in pairs(game.players) do
 		if player.valid and player.admin then
 			-- TODO: add localization
@@ -198,12 +241,14 @@ function reset_scripts()
 	end
 end
 
+
 -- Replaces tabulation with 2 spaces and removes unnecessary spaces
 ---@param code string
 ---@return string #code
 function format_code(code)
 	return code:gsub("[ ]+\n", "\n"):gsub("\t", "  ")
 end
+
 
 ---@param title string|LocalisedString
 ---@param description? string
@@ -212,18 +257,19 @@ end
 function add_admin_script(title, description, code)
 	code = format_code(code)
 	local f = load(code)
-	if type(f) == "function" then
-		local id = mod_data.last_admin_id + 1
-		mod_data.last_admin_id = id
-		compiled_admin_code[id] = load(code)
-		admin_script_data[id] = {
-			description = description,
-			title = title,
-			code = code
-		}
-		return id
-	end
+	if type(f) ~= "function" then return end
+
+	local id = mod_data.last_admin_id + 1
+	mod_data.last_admin_id = id
+	compiled_admin_code[id] = load(code)
+	admin_script_data[id] = {
+		description = description,
+		title = title,
+		code = code
+	}
+	return id
 end
+
 
 ---@param title string|LocalisedString
 ---@param description? string
@@ -232,17 +278,33 @@ end
 function add_public_script(title, description, code)
 	code = format_code(code)
 	local f = load(code)
-	if type(f) == "function" then
-		local id = mod_data.last_public_id + 1
-		mod_data.last_public_id = id
-		compiled_public_code[id] = load(code)
-		public_script_data[id] = {
-			description = description,
-			title = title,
-			code = code
-		}
-		return id
-	end
+	if type(f) ~= "function" then return end
+
+	local id = mod_data.last_public_id + 1
+	mod_data.last_public_id = id
+	compiled_public_code[id] = load(code)
+	public_script_data[id] = {
+		description = description,
+		title = title,
+		code = code
+	}
+	return id
+end
+
+
+---@param name string
+---@param description? string
+---@param code string
+function add_rcon_script(name, description, code)
+	code = format_code(code)
+	local f = load(code)
+	if type(f) ~= "function" then return end
+
+	compiled_rcon_code[name] = load(code)
+	rcon_script_data[name] = {
+		description = description,
+		code = code
+	}
 end
 
 local function destroy_GUI_event(event)
@@ -261,10 +323,11 @@ local function destroy_GUI_event(event)
 	end
 end
 
----@param player PlayerIdentification
----@param is_public_code boolean
----@param id? number
-function open_code_editor(player, is_public_code, id)
+
+---@param player table #LuaPlayer
+---@param book_type integer
+---@param id? integer|string
+function switch_code_editor(player, book_type, id)
 	local screen = player.gui.screen
 	if screen.UB_code_editor then
 		screen.UB_code_editor.destroy()
@@ -273,10 +336,12 @@ function open_code_editor(player, is_public_code, id)
 
 	local data
 	if id then
-		if is_public_code then
+		if book_type == BOOK_TYPES.public then
 			data = public_script_data[id]
-		else
+		elseif book_type == BOOK_TYPES.admin then
 			data = admin_script_data[id]
+		else -- rcon
+			data = rcon_script_data[id]
 		end
 	end
 
@@ -304,10 +369,21 @@ function open_code_editor(player, is_public_code, id)
 	content.name = "UB_add_code"
 	content.sprite = "plus_white"
 	flow.add(content).visible = false
-	flow.add{type = "label", caption = {'', {"useful_book.is_public_script"}, {"colon"}}}
-	flow.add{type = "checkbox", name = "UB_is_public_script", state = is_public_code, enabled = id and false}
+	if book_type ~= BOOK_TYPES.rcon then
+		flow.add{type = "label", caption = {'', {"useful_book.is_public_script"}, {"colon"}}}
+	end
+	local UB_is_public_script = flow.add{type = "checkbox", name = "UB_is_public_script", state = (book_type == BOOK_TYPES.public), enabled = id and false}
+	if book_type == BOOK_TYPES.rcon then
+		UB_is_public_script.visible = false
+	end
+	flow.add{type = "checkbox", name = "UB_is_rcon_script", state = (book_type == BOOK_TYPES.rcon), visible = false}
 	if id then
-		flow.add{type = "label", name = "id", caption = tonumber(id), visible = false}
+		local label = flow.add{type = "label", name = "id", visible = false}
+		if book_type == BOOK_TYPES.rcon then
+			label.caption = id
+		else
+			label.caption = tonumber(id)
+		end
 	end
 
 	main_frame.add({type = "label", name = "error_message", style = "bold_red_label", visible = false})
@@ -317,10 +393,14 @@ function open_code_editor(player, is_public_code, id)
 	flow.name = "UB_title"
 	flow.add{type = "label", caption = {'', "Title", {"colon"}}}
 
-	local is_text = (data == nil) or (type(data.title) == "string")
+	local is_text = (data == nil) or (data.title == nil or type(data.title) == "string")
 	if is_text then
 		local textfield = flow.add{type = "textfield", name = "textfield"}
-		textfield.text = data and data.title or ''
+		if book_type == BOOK_TYPES.rcon then
+			textfield.text = id or ''
+		else
+			textfield.text = data and data.title or ''
+		end
 		textfield.style.horizontally_stretchable = true
 		textfield.style.maximal_width = 0
 	else
@@ -340,12 +420,15 @@ function open_code_editor(player, is_public_code, id)
 	end
 
 	local input = scroll_pane.add{type = "text-box", name = "UB_program_input", style = "UB_program_input"}
-	input.text = data and data.code or DEFAULT_TEXT
+	if book_type == BOOK_TYPES.rcon then
+		input.text = data and data.code or DEFAULT_RCON_TEXT
+	else
+		input.text = data and data.code or DEFAULT_TEXT
+	end
 	main_frame.force_auto_center()
 end
 
 local function fill_with_public_data(table_element, player)
-	local LABEL = {type = "label"}
 	local RUN_BUTTON = {
 		type = "sprite-button",
 		name = "UB_run_public_script",
@@ -386,7 +469,6 @@ local function fill_with_public_data(table_element, player)
 end
 
 local function fill_with_admin_data(table_element)
-	local LABEL = {type = "label"}
 	local RUN_BUTTON = {
 		type = "sprite-button",
 		name = "UB_run_admin_code",
@@ -424,9 +506,39 @@ local function fill_with_admin_data(table_element)
 	end
 end
 
----@param player PlayerIdentification
----@param is_public_data boolean
-function switch_book(player, is_public_data)
+local function fill_with_rcon_data(table_element)
+	local DELETE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_delete_rcon_code",
+		style = "frame_action_button",
+		sprite = "utility/trash_white",
+		hovered_sprite = "utility/trash",
+		clicked_sprite = "utility/trash"
+	}
+	local CHANGE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_change_rcon_code",
+		style = "frame_action_button",
+		sprite = "map_exchange_string_white",
+		hovered_sprite = "utility/map_exchange_string",
+		clicked_sprite = "utility/map_exchange_string"
+	}
+	local label, flow
+	for name, data in pairs(rcon_script_data) do
+		label = table_element.add(LABEL)
+		label.tooltip = data.description or ''
+		label.caption = name
+		flow = table_element.add(FLOW)
+		flow.name = name
+		flow.add(CHANGE_BUTTON)
+		flow.add(DELETE_BUTTON)
+	end
+end
+
+
+---@param player table #LuaPlayer
+---@param book_type integer
+function switch_book(player, book_type)
 	local screen = player.gui.screen
 	if screen.UB_book_frame then
 		screen.UB_book_frame.destroy()
@@ -447,7 +559,7 @@ function switch_book(player, is_public_data)
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
 	if player.admin then
-		local button = footer.add{
+		footer.add{
 			type = "sprite-button",
 			name = "UB_open_import",
 			sprite = "utility/import", -- TODO: add white button
@@ -465,39 +577,39 @@ function switch_book(player, is_public_data)
 	end
 	footer.add(CLOSE_BUTTON)
 
-	local title_table = main_frame.add{type = "table", column_count = 3}
-	title_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
-	if is_public_data then
-		title_table.add{type = "label", caption = {"useful_book.public_scripts"}}
-	else
-		title_table.add{type = "label", caption = {"useful_book.admin_scripts"}}
-	end
+	local content_table = main_frame.add{type = "table", name = "content_table", column_count = 3}
+	content_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
+
+	content_table.add(LABEL).caption = BOOK_TITLES[book_type]
 	if player.admin then
-		if is_public_data then
-			title_table.name = "public_cover"
-		else
-			title_table.name = "admin_cover"
-		end
-		local sub_flow = title_table.add(FLOW)
+		local sub_flow = content_table.add(FLOW)
+		sub_flow.name = "nav_flow"
 		sub_flow.style.horizontally_stretchable = true
 		sub_flow.add{
+			type = "drop-down", name = "UB_book_type",
+			items = BOOK_TITLES,
+			selected_index = book_type or 1
+		}
+		sub_flow.add{
 			type = "sprite-button",
-			name = "UB_change_book",
+			name = "UB_update_book",
 			style = "frame_action_button",
 			sprite = "utility/reset_white",
 			hovered_sprite = "utility/reset",
 			clicked_sprite = "utility/reset"
 		}
 	else
-		title_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
+		content_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
 	end
 
 	local scroll_pane = main_frame.add{type = "scroll-pane", name = "scroll_pane"}
 	local scripts_table = scroll_pane.add{type = "table", column_count = 2}
-	if is_public_data then
+	if book_type == BOOK_TYPES.public then
 		fill_with_public_data(scripts_table, player)
-	else
+	elseif book_type == BOOK_TYPES.admin then
 		fill_with_admin_data(scripts_table)
+	else -- rcon
+		fill_with_rcon_data(scripts_table)
 	end
 
 	main_frame.force_auto_center()
@@ -551,9 +663,9 @@ local GUIS = {
 	UB_book = function(element, player, event)
 		if player.admin then
 			if event.control then
-				open_code_editor(player, not event.shift)
+				switch_code_editor(player, (event.shift and BOOK_TYPES.admin) or BOOK_TYPES.public)
 			else
-				switch_book(player, not event.shift)
+				switch_book(player, (event.shift and BOOK_TYPES.admin) or BOOK_TYPES.public)
 			end
 		else
 			local UB_book_frame = player.gui.screen.UB_book_frame
@@ -563,7 +675,7 @@ local GUIS = {
 				if next(public_script_data) == nil then
 					player.print({"useful_book.no-public-scripts"})
 				else
-					switch_book(player, true)
+					switch_book(player, BOOK_TYPES.public)
 				end
 			end
 		end
@@ -614,15 +726,28 @@ local GUIS = {
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
 	end,
+	UB_delete_rcon_code = function(element, player)
+		local name = element.parent.name
+		rcon_script_data[name] = nil
+		compiled_rcon_code[name] = nil
+		local flow = element.parent
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
+	end,
 	UB_change_public_script = function(element, player)
-		open_code_editor(player, true, tonumber(element.parent.name))
+		switch_code_editor(player, BOOK_TYPES.public, tonumber(element.parent.name))
 	end,
 	UB_change_admin_code = function(element, player)
-		open_code_editor(player, false, tonumber(element.parent.name))
+		switch_code_editor(player, BOOK_TYPES.admin, tonumber(element.parent.name))
+	end,
+	UB_change_rcon_code = function(element, player)
+		switch_code_editor(player, BOOK_TYPES.rcon, element.parent.name)
 	end,
 	UB_open_code_editor = function(element, player)
-		player.gui.screen.UB_book_frame.destroy()
-		open_code_editor(player, true)
+		local UB_book_frame = element.parent.parent
+		local book_type = UB_book_frame.content_table.nav_flow.UB_book_type.selected_index
+		UB_book_frame.destroy()
+		switch_code_editor(player, book_type)
 	end,
 	UB_add_code = function(element, player)
 		local title, description, code
@@ -661,43 +786,63 @@ local GUIS = {
 			end
 		end
 		local UB_is_public_script = flow.UB_is_public_script
-		local is_public_code = UB_is_public_script.state
+		local UB_is_rcon_script = flow.UB_is_rcon_script
+		local book_type
+		if UB_is_public_script.state then
+			book_type = BOOK_TYPES.public
+		elseif UB_is_rcon_script.state then
+			book_type = BOOK_TYPES.rcon
+		else
+			book_type = BOOK_TYPES.admin
+		end
 		local is_enabled = UB_is_public_script.enabled
 		if not is_enabled then
-			local id = tonumber(flow.id.caption)
-			if is_public_code then
-				compiled_public_code[id] = load(code)
-				public_script_data[id] = {
-					description = description,
-					title = title,
-					code = code
-				}
-			else
+			-- TODO: RECHECK
+			if book_type == BOOK_TYPES.admin then
+				local id = tonumber(flow.id.caption)
 				compiled_admin_code[id] = load(code)
 				admin_script_data[id] = {
 					description = description,
 					title = title,
 					code = code
 				}
+			elseif book_type == BOOK_TYPES.public then
+				local id = tonumber(flow.id.caption)
+				compiled_public_code[id] = load(code)
+				public_script_data[id] = {
+					description = description,
+					title = title,
+					code = code
+				}
+			else -- rcon
+				local name = flow.id.caption
+				compiled_rcon_code[name] = load(code)
+				rcon_script_data[name] = {
+					description = description,
+					code = code
+				}
 			end
 		else
-			if is_public_code then
-				add_public_script(title, description, code)
-			else
+			if book_type == BOOK_TYPES.admin then
 				add_admin_script(title, description, code)
+			elseif book_type == BOOK_TYPES.public then
+				add_public_script(title, description, code)
+			else -- rcon
+				add_rcon_script(title, description, code)
 			end
 		end
 		element.parent.parent.destroy()
-		switch_book(player, is_public_code)
+		switch_book(player, book_type)
 	end,
 	UB_run_code = function(element, player)
 		local is_ok, error = pcall(load(element.parent.parent.scroll_pane.UB_program_input.text), player)
 		if not is_ok then
-			local main_frame = element.parent.parent
+			local flow = element.parent
+			local main_frame = flow.parent
 			local error_message = main_frame.error_message
 			error_message.caption = error
 			error_message.visible = true
-			element.parent.UB_add_code.visible = false
+			flow.UB_add_code.visible = false
 			element.name = "UB_check_code"
 			element.sprite = "refresh"
 			element.hovered_sprite = ''
@@ -705,13 +850,16 @@ local GUIS = {
 		end
 	end,
 	UB_check_code = function(element, player)
-		local main_frame = element.parent.parent
+		local flow = element.parent
+		local main_frame = flow.parent
 		local f = load(main_frame.scroll_pane.UB_program_input.text)
 		if type(f) == "function" then
-			element.name = "UB_run_code"
-			element.sprite = "lua_snippet_tool_icon_white"
-			element.hovered_sprite = "utility/lua_snippet_tool_icon"
-			element.clicked_sprite = "utility/lua_snippet_tool_icon"
+			if flow.UB_is_rcon_script.state == false then
+				element.name = "UB_run_code"
+				element.sprite = "lua_snippet_tool_icon_white"
+				element.hovered_sprite = "utility/lua_snippet_tool_icon"
+				element.clicked_sprite = "utility/lua_snippet_tool_icon"
+			end
 			element.parent.UB_add_code.visible = true
 			local error_message = main_frame.error_message
 			error_message.caption = nil
@@ -720,16 +868,6 @@ local GUIS = {
 			local error_message = main_frame.error_message
 			error_message.caption = {"useful_book.cant-compile"}
 			error_message.visible = true
-		end
-	end,
-	UB_change_book = function(element, player)
-		local table_element = element.parent.parent
-		if table_element.name == "admin_cover" then
-			table_element.parent.destroy()
-			switch_book(player, true)
-		else
-			table_element.parent.destroy()
-			switch_book(player, false)
 		end
 	end,
 	UB_import = function(element, player)
@@ -743,6 +881,12 @@ local GUIS = {
 		if import_scripts(UB_import_frame.UB_text_for_import.text, player) then
 			UB_import_frame.destroy()
 		end
+	end,
+	UB_update_book = function(element, player)
+		local parent = element.parent
+		local book_type = parent.UB_book_type.selected_index
+		parent.parent.parent.destroy()
+		switch_book(player, book_type)
 	end,
 	UB_open_import = open_import_frame
 }
@@ -762,11 +906,14 @@ end
 --#region Pre-game stage
 
 local function compile_all_text()
+	for id, data in pairs(admin_script_data) do
+		compiled_admin_code[id] = load(data.code)
+	end
 	for id, data in pairs(public_script_data) do
 		compiled_public_code[id] = load(data.code)
 	end
-	for id, data in pairs(admin_script_data) do
-		compiled_admin_code[id] = load(data.code)
+	for name, data in pairs(rcon_script_data) do
+		compiled_rcon_code[name] = load(data.code)
 	end
 end
 
@@ -774,6 +921,7 @@ local function link_data()
 	mod_data = global.useful_book
 	public_script_data = mod_data.public_script_data
 	admin_script_data = mod_data.admin_script_data
+	rcon_script_data = mod_data.rcon_script_data
 end
 
 local function update_global_data()
@@ -781,6 +929,7 @@ local function update_global_data()
 	mod_data = global.useful_book
 	mod_data.public_script_data = mod_data.public_script_data or {}
 	mod_data.admin_script_data = mod_data.admin_script_data or {}
+	mod_data.rcon_script_data = mod_data.rcon_script_data or {}
 	mod_data.last_public_id = mod_data.last_public_id or 0
 	mod_data.last_admin_id = mod_data.last_admin_id or 0
 
@@ -815,6 +964,13 @@ M.on_configuration_changed = function(event)
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
+	if version < 0.14 then
+		add_rcon_script(
+			"Print Twitch message", "",
+			'local username, message = ...\
+			game.print({"", "[Twitch] ", username, {"COLON"}, " ", message})'
+		)
+	end
 	if version < 0.11 then
 		add_admin_script(
 			{"scripts-titles.kill-half-enemies"},
@@ -862,8 +1018,13 @@ M.add_remote_interface = function()
 			public_script_data[id] = nil
 			compiled_public_code[id] = nil
 		end,
+		delete_rcon_script = function(name)
+			rcon_script_data[name] = nil
+			compiled_rcon_code[name] = nil
+		end,
 		add_admin_script = add_admin_script,
 		add_public_script = add_public_script,
+		add_rcon_script = add_rcon_script,
 		run_admin_script = function(id, player)
 			local f = compiled_public_code[id]
 			if f == nil then return end
@@ -893,13 +1054,23 @@ M.events = {
 	[defines.events.on_player_joined_game] = destroy_GUI_event,
 	[defines.events.on_player_left_game] = destroy_GUI_event,
 	[defines.events.on_player_demoted] = destroy_GUI_event,
+	[defines.events.on_gui_selection_state_changed] = function(event)
+		local element = event.element
+		if not (element and element.valid) then return end
+		if element.name ~= "UB_book_type" then return end
+		local player = game.get_player(event.player_index)
+		local book_type = element.selected_index
+		element.parent.parent.parent.destroy()
+		switch_book(player, book_type)
+	end,
 }
 
 M.commands = {
 	["Ubook-export"] = function(cmd)
 		local raw_data = {
 			public = {},
-			admin = {}
+			admin = {},
+			rcon = rcon_script_data
 		}
 
 		local public_data = raw_data.public

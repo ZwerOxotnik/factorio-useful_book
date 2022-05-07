@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.14.0
+Date: 07. 05. 2022
+  Features:
+    - Added support of rcon scripts /sc __useful_book__ RunRCONScript("script name", ...)
+  Changes:
+    - Slightly changed interface for admins
+---------------------------------------------------------------------------------------------------
 Version: 0.13.1
 Date: 10. 04. 2022
   Changes:

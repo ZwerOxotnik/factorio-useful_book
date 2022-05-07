@@ -21,5 +21,5 @@ else
 end
 
 modules.better_commands:handle_custom_commands(modules.useful_book) -- adds commands
-
 event_handler.add_libraries(modules)
+if script.active_mods["gvv"] then require("__gvv__.gvv")() end
