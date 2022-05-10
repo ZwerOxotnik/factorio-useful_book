@@ -231,7 +231,7 @@ function reset_scripts()
 	add_rcon_script(
 		"Print Twitch message", "",
 		'local username, message = ...\
-		game.print({"", "[Twitch] ", username, {"COLON"}, " ", message})'
+		game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})'
 	)
 	for _, player in pairs(game.players) do
 		if player.valid and player.admin then
@@ -968,7 +968,7 @@ M.on_configuration_changed = function(event)
 		add_rcon_script(
 			"Print Twitch message", "",
 			'local username, message = ...\
-			game.print({"", "[Twitch] ", username, {"COLON"}, " ", message})'
+			game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})'
 		)
 	end
 	if version < 0.11 then
