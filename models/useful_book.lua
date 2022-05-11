@@ -964,7 +964,7 @@ M.on_configuration_changed = function(event)
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
-	if version < 0.14 then
+	if version < 0.15 then
 		add_rcon_script(
 			"Print Twitch message", "",
 			'local username, message = ...\
