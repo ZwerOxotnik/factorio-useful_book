@@ -1,6 +1,10 @@
 ---@class UB : module
 local M = {}
 
+
+is_server = false -- this is for rcon
+
+
 --#region Global data
 local mod_data
 ---@type table<integer, table>
@@ -22,7 +26,7 @@ local compiled_rcon_code = {}
 --#region Constants
 local print_to_rcon = rcon.print
 local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
-local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nrcon.print(game.table_to_json(global.my_data))"
+local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(game.table_to_json(global.my_data))"
 local FLOW = {type = "flow"}
 local LABEL = {type = "label"}
 local EMPTY_WIDGET = {type = "empty-widget"}
@@ -1004,7 +1008,15 @@ M.add_remote_interface = function()
 	remote.remove_interface("useful_book") -- For safety
 	remote.add_interface("useful_book", {
 		get_source = function()
-			return script.mod_name
+			local mod_name = script.mod_name
+			print_to_rcon(mod_name) -- Returns "level" if it's a scenario, otherwise "useful_book" as a mod.
+			return mod_name
+		end,
+		activate_rcon = function()
+			is_server = true
+		end,
+		deactivate_rcon = function()
+			is_server = false
 		end,
 		get_mod_data = function()
 			return mod_data
