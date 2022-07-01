@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.16.0
+Date: 01. 07. 2022
+  Features:
+    - Added new tool for admins. Admins can select entities by new tool (see shortcuts) and apply a custom script on them.
+---------------------------------------------------------------------------------------------------
 Version: 0.15.1
 Date: 13. 05. 2022
   Scripting:

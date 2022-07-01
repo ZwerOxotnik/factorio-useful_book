@@ -44,3 +44,43 @@ data:extend{
 		scale = 0.5
 	}, {type = "font", name = "default-mono", from = "default-mono", size = 16}
 }
+
+
+local hotkey_name = "UB_get_admin_area_tool"
+data:extend({
+	{type = "custom-input", name = hotkey_name, key_sequence = "", consuming = "game-only"},
+	{
+		type = "selection-tool",
+		name = "UB_admin_area_selection_tool",
+		icons = {
+			{icon = "__useful_book__/graphics/book.png"}
+		},
+		icon_size = 32,
+		flags = {"hidden", "not-stackable", "only-in-cursor", "spawnable"},
+		icon_mipmaps = nil,
+		subgroup = "tool",
+		stack_size = 1,
+		entity_filter_count = nil,
+		tile_filter_count = nil,
+		selection_color = {255, 145, 0},
+		alt_selection_color = {239, 153, 34},
+		selection_mode = {"any-entity"},
+		alt_selection_mode = {"nothing"},
+		selection_cursor_box_type = "entity",
+		alt_selection_cursor_box_type = "not-allowed"
+	}, {
+		type = "shortcut",
+		name = "UB_admin_area_tool_shortcut",
+		action = "spawn-item",
+		item_to_spawn = "UB_admin_area_selection_tool",
+		associated_control_input = hotkey_name,
+		icon = {
+			filename = "__useful_book__/graphics/book.png",
+			priority = "low",
+			size = 32,
+			flags = {"gui-icon"}
+		},
+		toggleable = true,
+		style = "blue"
+	}
+})
