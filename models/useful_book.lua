@@ -256,12 +256,24 @@ function reset_scripts()
 	)
 	add_admin_area_script(
 		"Indestructible",
-		'Makes selected entites indestructible',
+		'Makes selected entities indestructible',
 		'local _, _, entities = ...\
 		for i=1, #entities do\
 			local entity = entities[i]\
 			if entity.valid then\
 				entity.destructible = false\
+			end\
+		end'
+	)
+	add_admin_area_script(
+		"Destroy",
+		'Destroys selected entities safely',
+		'local _, _, entities = ...\
+		local raise_destroy = {raise_destroy=true}\
+		for i=1, #entities do\
+			local entity = entities[i]\
+			if entity.valid and not entity.is_player() then\
+				entity.destroy(raise_destroy)\
 			end\
 		end'
 	)
@@ -1098,16 +1110,16 @@ end
 --#region Pre-game stage
 
 local function compile_all_text()
-	for id, data in pairs(admin_script_data) do
+	for id, data in pairs(admin_script_data or {}) do
 		compiled_admin_code[id] = load(data.code)
 	end
-	for id, data in pairs(public_script_data) do
+	for id, data in pairs(public_script_data or {}) do
 		compiled_public_code[id] = load(data.code)
 	end
-	for name, data in pairs(admin_area_script_data) do
+	for name, data in pairs(admin_area_script_data or {}) do
 		compiled_admin_area_code[name] = load(data.code)
 	end
-	for name, data in pairs(rcon_script_data) do
+	for name, data in pairs(rcon_script_data or {}) do
 		compiled_rcon_code[name] = load(data.code)
 	end
 end
@@ -1166,12 +1178,24 @@ M.on_configuration_changed = function(event)
 	if version < 0.16 then
 		add_admin_area_script(
 			"Indestructible",
-			'Makes selected entites indestructible',
+			'Makes selected entities indestructible',
 			'local _, _, entities = ...\
 			for i=1, #entities do\
 				local entity = entities[i]\
 				if entity.valid then\
 					entity.destructible = false\
+				end\
+			end'
+		)
+		add_admin_area_script(
+			"Destroy",
+			'Destroys selected entities safely',
+			'local _, _, entities = ...\
+			local raise_destroy = {raise_destroy=true}\
+			for i=1, #entities do\
+				local entity = entities[i]\
+				if entity.valid and not entity.is_player() then\
+					entity.destroy(raise_destroy)\
 				end\
 			end'
 		)
