@@ -2,6 +2,9 @@
 local M = {}
 
 
+fun = require("lualib/fun")
+
+
 is_server = false -- this is for rcon
 
 
@@ -108,22 +111,22 @@ function import_scripts(json, player)
 
 	if raw_data.public then
 		for _, data in pairs(raw_data.public) do
-			add_public_script(data.title, data.descripton, data.code)
+			add_public_script(data.title, data.descripton, data.code, data.version)
 		end
 	end
 	if raw_data.admin then
 		for _, data in pairs(raw_data.admin) do
-			add_admin_script(data.title, data.descripton, data.code)
+			add_admin_script(data.title, data.descripton, data.code, data.version)
 		end
 	end
 	if raw_data.admin_area then
 		for name, data in pairs(raw_data.admin_area) do
-			add_admin_area_script(name, data.descripton, data.code)
+			add_admin_area_script(name, data.descripton, data.code, data.version)
 		end
 	end
 	if raw_data.rcon then
 		for name, data in pairs(raw_data.rcon) do
-			add_rcon_script(name, data.descripton, data.code)
+			add_rcon_script(name, data.descripton, data.code, data.version)
 		end
 	end
 
@@ -332,15 +335,17 @@ end
 ---@param code string
 ---@return string #code
 function format_code(code)
+	---@diagnostic disable-next-line: redundant-return-value
 	return code:gsub("[ ]+\n", "\n"):gsub("\t", "  ")
 end
 
 
 ---@param title string|LocalisedString
----@param description? string
+---@param description? string|LocalisedString
 ---@param code string
+---@param version string?
 ---@return integer? #id
-function add_admin_script(title, description, code)
+function add_admin_script(title, description, code, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
@@ -351,17 +356,19 @@ function add_admin_script(title, description, code)
 	admin_script_data[id] = {
 		description = description,
 		title = title,
-		code = code
+		code = code,
+		version = version or script.active_mods.useful_book
 	}
 	return id
 end
 
 
 ---@param title string|LocalisedString
----@param description? string
+---@param description? string|LocalisedString
 ---@param code string
+---@param version string?
 ---@return integer? #id
-function add_public_script(title, description, code)
+function add_public_script(title, description, code, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
@@ -372,7 +379,8 @@ function add_public_script(title, description, code)
 	public_script_data[id] = {
 		description = description,
 		title = title,
-		code = code
+		code = code,
+		version = version or script.active_mods.useful_book
 	}
 	return id
 end
@@ -381,7 +389,8 @@ end
 ---@param name string
 ---@param description? string
 ---@param code string
-function add_admin_area_script(name, description, code)
+---@param version string?
+function add_admin_area_script(name, description, code, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
@@ -389,7 +398,8 @@ function add_admin_area_script(name, description, code)
 	compiled_admin_area_code[name] = load(code)
 	admin_area_script_data[name] = {
 		description = description,
-		code = code
+		code = code,
+		version = version or script.active_mods.useful_book
 	}
 end
 
@@ -397,7 +407,8 @@ end
 ---@param name string
 ---@param description? string
 ---@param code string
-function add_rcon_script(name, description, code)
+---@param version string?
+function add_rcon_script(name, description, code, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
@@ -405,7 +416,8 @@ function add_rcon_script(name, description, code)
 	compiled_rcon_code[name] = load(code)
 	rcon_script_data[name] = {
 		description = description,
-		code = code
+		code = code,
+		version = version or script.active_mods.useful_book
 	}
 end
 
@@ -489,7 +501,7 @@ function switch_code_editor(player, book_type, id)
 		if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area then
 			label.caption = id
 		else
-			label.caption = tointeger(id)
+			label.caption = tonumber(id)
 		end
 	end
 
@@ -853,6 +865,7 @@ local GUIS = {
 	end,
 	UB_delete_public_code = function(element, player)
 		local id = tonumber(element.parent.name)
+		---@cast id number
 		public_script_data[id] = nil
 		compiled_public_code[id] = nil
 		local flow = element.parent
@@ -861,6 +874,7 @@ local GUIS = {
 	end,
 	UB_delete_admin_code = function(element, player)
 		local id = tonumber(element.parent.name)
+		---@cast id number
 		admin_script_data[id] = nil
 		compiled_admin_code[id] = nil
 		local flow = element.parent
@@ -955,6 +969,7 @@ local GUIS = {
 			-- TODO: RECHECK
 			if book_type == BOOK_TYPES.admin then
 				local id = tonumber(flow.id.caption)
+				---@cast id number
 				compiled_admin_code[id] = load(code)
 				admin_script_data[id] = {
 					description = description,
@@ -963,6 +978,7 @@ local GUIS = {
 				}
 			elseif book_type == BOOK_TYPES.public then
 				local id = tonumber(flow.id.caption)
+				---@cast id number
 				compiled_public_code[id] = load(code)
 				public_script_data[id] = {
 					description = description,
@@ -1185,7 +1201,8 @@ M.on_configuration_changed = function(event)
 				if entity.valid then\
 					entity.destructible = false\
 				end\
-			end'
+			end',
+			"0.15"
 		)
 		add_admin_area_script(
 			"Destroy",
@@ -1197,14 +1214,16 @@ M.on_configuration_changed = function(event)
 				if entity.valid and not entity.is_player() then\
 					entity.destroy(raise_destroy)\
 				end\
-			end'
+			end',
+			"0.15"
 		)
 	end
 	if version < 0.15 then
 		add_rcon_script(
 			"Print Twitch message", "",
 			'local username, message = ...\
-			game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})'
+			game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})',
+			"0.14"
 		)
 	end
 	if version < 0.11 then
@@ -1216,7 +1235,8 @@ M.on_configuration_changed = function(event)
 			local entities = player.surface.find_entities_filtered({force="enemy"})\
 			for i=1, #entities, 2 do\
 				entities[i].destroy(raise_destroy)\
-			end'
+			end',
+			"0.10"
 		)
 	end
 

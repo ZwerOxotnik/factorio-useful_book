@@ -1,4 +1,15 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.16.2
+Date: 22. 08. 2022
+  Bugfixes:
+    - Fixed switching of code editor (it crushed for some scripts)
+  Changes:
+    - Saves mod version in export
+    - Added new library for scripts (see https://github.com/luafun/luafun ) (access via "fun")
+  Locale:
+    - Added German translation (thanks to @Xman1109 on crowdin)
+    - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
+---------------------------------------------------------------------------------------------------
 Version: 0.16.1
 Date: 02. 07. 2022
   Bugfixes:
