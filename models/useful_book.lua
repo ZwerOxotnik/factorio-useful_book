@@ -361,7 +361,7 @@ DEFAULT_COMMAND_TEXT = format_code(DEFAULT_COMMAND_TEXT)
 ---@param code string
 ---@return function
 function format_command_code(code)
-	local new_code = "local function custom_command(event, player)\n" .. code .. "\nend\n"
+	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
 	-- Should I prohibit access to some global variables
 	-- and make them a bit different for the command?
