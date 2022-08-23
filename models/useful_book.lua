@@ -18,6 +18,8 @@ local admin_script_data
 local admin_area_script_data
 ---@type table<string, table>
 local rcon_script_data
+---@type table<string, table>
+local custom_commands_data
 ---@type table<integer, string>
 local players_admin_area_script
 --#endregion
@@ -30,6 +32,8 @@ local compiled_admin_code = {}
 local compiled_admin_area_code = {}
 ---@type table<string, function>
 local compiled_rcon_code = {}
+---@type table<string, function>
+local compiled_commands_code = {}
 
 
 --#region Constants
@@ -37,6 +41,19 @@ local print_to_rcon = rcon.print
 local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
 local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(game.table_to_json(global.my_data))"
 local DEFAULT_ADMIN_AREA_TEXT = "local area, player, entities = ...\n"
+local DEFAULT_COMMAND_TEXT = [[
+if event.player_index == 0 then -- stop this command if we got it via server console/rcon 
+	print({"prohibited-server-command"})
+	return
+end
+if player == nil then return end
+if not player.admin then
+	player.print({'command-output.parameters-require-admin'})
+	return
+end
+player.print(player.name)
+]]
+local COLON = {"colon"}
 local FLOW = {type = "flow"}
 local LABEL = {type = "label"}
 local EMPTY_WIDGET = {type = "empty-widget"}
@@ -53,13 +70,15 @@ local BOOK_TYPES = {
 	admin = 1,
 	public = 2,
 	rcon = 3,
-	admin_area = 4
+	admin_area = 4,
+	command = 5
 }
 local BOOK_TITLES = {
 	[BOOK_TYPES.admin] = {"useful_book.admin_scripts"},
 	[BOOK_TYPES.public] = {"useful_book.public_scripts"},
 	[BOOK_TYPES.rcon] = {"useful_book.rcon_scripts"},
 	[BOOK_TYPES.admin_area] = {"useful_book.admin_area_scripts"},
+	[BOOK_TYPES.command] = {"useful_book.custom_commands"}
 }
 --#endregion
 
@@ -109,25 +128,20 @@ function import_scripts(json, player)
 		return false
 	end
 
-	if raw_data.public then
-		for _, data in pairs(raw_data.public) do
-			add_public_script(data.title, data.descripton, data.code, data.version)
-		end
+	for _, data in pairs(raw_data.public or {}) do
+		add_public_script(data.title, data.descripton, data.code, nil, data.version)
 	end
-	if raw_data.admin then
-		for _, data in pairs(raw_data.admin) do
-			add_admin_script(data.title, data.descripton, data.code, data.version)
-		end
+	for _, data in pairs(raw_data.admin or {}) do
+		add_admin_script(data.title, data.descripton, data.code, nil, data.version)
 	end
-	if raw_data.admin_area then
-		for name, data in pairs(raw_data.admin_area) do
-			add_admin_area_script(name, data.descripton, data.code, data.version)
-		end
+	for name, data in pairs(raw_data.admin_area or {}) do
+		add_admin_area_script(name, data.descripton, data.code, data.version)
 	end
-	if raw_data.rcon then
-		for name, data in pairs(raw_data.rcon) do
-			add_rcon_script(name, data.descripton, data.code, data.version)
-		end
+	for name, data in pairs(raw_data.rcon or {}) do
+		add_rcon_script(name, data.descripton, data.code, data.version)
+	end
+	for name, data in pairs(raw_data.commands or {}) do
+		add_new_command(name, data.descripton, data.code, data.version)
 	end
 
 	-- TODO: add localization
@@ -196,10 +210,13 @@ function reset_scripts()
 	admin_area_script_data = mod_data.admin_area_script_data
 	mod_data.rcon_script_data = {}
 	rcon_script_data = mod_data.rcon_script_data
+	mod_data.custom_commands_data = {}
+	custom_commands_data = mod_data.custom_commands_data
 	ompiled_admin_code = {}
 	compiled_public_code = {}
 	compiled_admin_area_code = {}
 	compiled_rcon_code = {}
+	compiled_commands_code = {}
 	add_admin_script(
 		{"scripts-titles.reveal-gen-map"},
 		{"scripts-description.reveal-gen-map"},
@@ -338,21 +355,50 @@ function format_code(code)
 	---@diagnostic disable-next-line: redundant-return-value
 	return code:gsub("[ ]+\n", "\n"):gsub("\t", "  ")
 end
+DEFAULT_COMMAND_TEXT = format_code(DEFAULT_COMMAND_TEXT)
+
+
+---@param code string
+---@return function
+function format_command_code(code)
+	local new_code = "local function custom_command(event, player)\n" .. code .. "\nend\n"
+	-- TODO: improve the error message!
+	-- Should I prohibit access to some global variables
+	-- and make them a bit different for the command?
+	local new_code2 = [[return function(event)
+		game.print(serpent.block(event))
+		local player = game.get_player(event.player_index)
+		if not (player and player.valid) then
+			player = nil
+		end
+		local is_ok, error = pcall(custom_command, event, player)
+		if not is_ok then
+			player.print(error, {1, 0, 0})
+		end
+	end
+	]]
+
+	---@diagnostic disable-next-line: return-type-mismatch
+	return load(new_code .. new_code2)()
+end
 
 
 ---@param title string|LocalisedString
 ---@param description? string|LocalisedString
 ---@param code string
+---@param id number?
 ---@param version string?
 ---@return integer? #id
-function add_admin_script(title, description, code, version)
+function add_admin_script(title, description, code, id, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
 
-	local id = mod_data.last_admin_id + 1
-	mod_data.last_admin_id = id
-	compiled_admin_code[id] = load(code)
+	if id == nil then
+		id = mod_data.last_admin_id + 1
+		mod_data.last_admin_id = id
+	end
+	compiled_admin_code[id] = f
 	admin_script_data[id] = {
 		description = description,
 		title = title,
@@ -366,16 +412,19 @@ end
 ---@param title string|LocalisedString
 ---@param description? string|LocalisedString
 ---@param code string
+---@param id number?
 ---@param version string?
 ---@return integer? #id
-function add_public_script(title, description, code, version)
+function add_public_script(title, description, code, id, version)
 	code = format_code(code)
 	local f = load(code)
 	if type(f) ~= "function" then return end
 
-	local id = mod_data.last_public_id + 1
-	mod_data.last_public_id = id
-	compiled_public_code[id] = load(code)
+	if id == nil then
+		id = mod_data.last_public_id + 1
+		mod_data.last_public_id = id
+	end
+	compiled_public_code[id] = f
 	public_script_data[id] = {
 		description = description,
 		title = title,
@@ -395,7 +444,7 @@ function add_admin_area_script(name, description, code, version)
 	local f = load(code)
 	if type(f) ~= "function" then return end
 
-	compiled_admin_area_code[name] = load(code)
+	compiled_admin_area_code[name] = f
 	admin_area_script_data[name] = {
 		description = description,
 		code = code,
@@ -413,12 +462,36 @@ function add_rcon_script(name, description, code, version)
 	local f = load(code)
 	if type(f) ~= "function" then return end
 
-	compiled_rcon_code[name] = load(code)
+	compiled_rcon_code[name] = f
 	rcon_script_data[name] = {
 		description = description,
 		code = code,
 		version = version or script.active_mods.useful_book
 	}
+end
+
+
+---@param name string
+---@param description? string
+---@param code string
+---@param version string?
+function add_new_command(name, description, code, version)
+	code = format_code(code)
+	if type(load(code)) ~= "function" then return end
+
+	custom_commands_data[name] = {
+		description = description,
+		code = code,
+		version = version or script.active_mods.useful_book
+	}
+	if not commands.commands[name] and not commands.game_commands[name] then
+		custom_commands_data[name].is_added = true
+		local f = format_command_code(code)
+		compiled_commands_code[name] = f
+		commands.add_command(name, description or '', f)
+	else
+		custom_commands_data[name].is_added = false
+	end
 end
 
 local function destroy_GUI_event(event)
@@ -458,6 +531,8 @@ function switch_code_editor(player, book_type, id)
 			data = admin_script_data[id]
 		elseif book_type == BOOK_TYPES.admin_area then
 			data = admin_area_script_data[id]
+		elseif book_type == BOOK_TYPES.command then
+			data = custom_commands_data[id]
 		else -- rcon
 			data = rcon_script_data[id]
 		end
@@ -487,18 +562,19 @@ function switch_code_editor(player, book_type, id)
 	content.name = "UB_add_code"
 	content.sprite = "plus_white"
 	flow.add(content).visible = false
-	if book_type ~= BOOK_TYPES.rcon and book_type ~= BOOK_TYPES.admin_area then
-		flow.add{type = "label", caption = {'', {"useful_book.is_public_script"}, {"colon"}}}
+	if book_type ~= BOOK_TYPES.rcon and book_type ~= BOOK_TYPES.admin_area and book_type ~= BOOK_TYPES.command then
+		flow.add{type = "label", caption = {'', {"useful_book.is_public_script"}, COLON}}
 	end
 	local UB_is_public_script = flow.add{type = "checkbox", name = "UB_is_public_script", state = (book_type == BOOK_TYPES.public), enabled = id and false}
-	if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area then
+	if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area or book_type == BOOK_TYPES.command then
 		UB_is_public_script.visible = false
 	end
 	flow.add{type = "checkbox", name = "UB_is_rcon_script", state = (book_type == BOOK_TYPES.rcon), visible = false}
 	flow.add{type = "checkbox", name = "UB_is_admin_area_script", state = (book_type == BOOK_TYPES.admin_area), visible = false}
+	flow.add{type = "checkbox", name = "UB_is_command", state = (book_type == BOOK_TYPES.command), visible = false}
 	if id then
 		local label = flow.add{type = "label", name = "id", visible = false}
-		if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area then
+		if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area or book_type == BOOK_TYPES.command then
 			label.caption = id
 		else
 			label.caption = tonumber(id)
@@ -510,12 +586,18 @@ function switch_code_editor(player, book_type, id)
 	local scroll_pane = main_frame.add{type = "scroll-pane", name = "scroll_pane"}
 	flow = scroll_pane.add(FLOW)
 	flow.name = "UB_title"
-	flow.add{type = "label", caption = {'', "Title", {"colon"}}}
+	local title_label = flow.add(LABEL)
+	-- TODO: add localization!
+	if book_type == BOOK_TYPES.command then
+		title_label.caption = {'', "Command name", COLON}
+	else
+		title_label.caption = {'', "Title", COLON}
+	end
 
 	local is_text = (data == nil) or (data.title == nil or type(data.title) == "string")
 	if is_text then
 		local textfield = flow.add{type = "textfield", name = "textfield"}
-		if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area then
+		if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area or book_type == BOOK_TYPES.command then
 			textfield.text = id or ''
 		else
 			textfield.text = data and data.title or ''
@@ -528,7 +610,7 @@ function switch_code_editor(player, book_type, id)
 
 	is_text = (data == nil) or (type(data.title) == "string")
 	if is_text then
-		scroll_pane.add{type = "label", caption = {'', "Description", {"colon"}}}
+		scroll_pane.add(LABEL).caption = {'', "Description", COLON}
 		local text_box = scroll_pane.add{type = "text-box", name = "UB_description"}
 		text_box.text = data and data.description or ''
 		text_box.style.horizontally_stretchable = true
@@ -543,6 +625,8 @@ function switch_code_editor(player, book_type, id)
 		input.text = data and data.code or DEFAULT_RCON_TEXT
 	elseif book_type == BOOK_TYPES.admin_area then
 		input.text = data and data.code or DEFAULT_ADMIN_AREA_TEXT
+	elseif book_type == BOOK_TYPES.command then
+		input.text = data and data.code or DEFAULT_COMMAND_TEXT
 	else
 		input.text = data and data.code or DEFAULT_TEXT
 	end
@@ -685,6 +769,35 @@ local function fill_with_rcon_data(table_element)
 	end
 end
 
+local function fill_with_custom_commands_data(table_element)
+	local DELETE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_delete_custom_command",
+		style = "frame_action_button",
+		sprite = "utility/trash_white",
+		hovered_sprite = "utility/trash",
+		clicked_sprite = "utility/trash"
+	}
+	local CHANGE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_change_command_code",
+		style = "frame_action_button",
+		sprite = "map_exchange_string_white",
+		hovered_sprite = "utility/map_exchange_string",
+		clicked_sprite = "utility/map_exchange_string"
+	}
+	local label, flow
+	for name, data in pairs(custom_commands_data) do
+		label = table_element.add(LABEL)
+		label.tooltip = data.description or ''
+		label.caption = name
+		flow = table_element.add(FLOW)
+		flow.name = name
+		flow.add(CHANGE_BUTTON)
+		flow.add(DELETE_BUTTON)
+	end
+end
+
 
 ---@param player table #LuaPlayer
 ---@param book_type integer
@@ -760,6 +873,8 @@ function switch_book(player, book_type)
 		fill_with_admin_data(scripts_table)
 	elseif book_type == BOOK_TYPES.admin_area then
 		fill_with_admin_area_data(scripts_table)
+	elseif book_type == BOOK_TYPES.command then
+		fill_with_custom_commands_data(scripts_table)
 	else -- rcon
 		fill_with_rcon_data(scripts_table)
 	end
@@ -897,6 +1012,17 @@ local GUIS = {
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
 	end,
+	UB_delete_custom_command = function(element, player)
+		local name = element.parent.name
+		commands.remove_command(name)
+		custom_commands_data[name] = nil
+		if compiled_commands_code[name] then -- there's something weird about Factorio lua, so I shouldn't nil twice
+			compiled_commands_code[name] = nil
+		end
+		local flow = element.parent
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
+	end,
 	UB_change_public_script = function(element, player)
 		switch_code_editor(player, BOOK_TYPES.public, tonumber(element.parent.name))
 	end,
@@ -908,6 +1034,9 @@ local GUIS = {
 	end,
 	UB_change_rcon_code = function(element, player)
 		switch_code_editor(player, BOOK_TYPES.rcon, element.parent.name)
+	end,
+	UB_change_command_code = function(element, player)
+		switch_code_editor(player, BOOK_TYPES.command, element.parent.name)
 	end,
 	UB_open_code_editor = function(element, player)
 		local UB_book_frame = element.parent.parent
@@ -954,6 +1083,7 @@ local GUIS = {
 		local UB_is_public_script = flow.UB_is_public_script
 		local UB_is_rcon_script = flow.UB_is_rcon_script
 		local UB_is_admin_area_script = flow.UB_is_admin_area_script
+		local UB_is_command = flow.UB_is_command
 		local book_type
 		if UB_is_public_script.state then
 			book_type = BOOK_TYPES.public
@@ -961,6 +1091,8 @@ local GUIS = {
 			book_type = BOOK_TYPES.admin_area
 		elseif UB_is_rcon_script.state then
 			book_type = BOOK_TYPES.rcon
+		elseif UB_is_command.state then
+			book_type = BOOK_TYPES.command
 		else
 			book_type = BOOK_TYPES.admin
 		end
@@ -970,35 +1102,20 @@ local GUIS = {
 			if book_type == BOOK_TYPES.admin then
 				local id = tonumber(flow.id.caption)
 				---@cast id number
-				compiled_admin_code[id] = load(code)
-				admin_script_data[id] = {
-					description = description,
-					title = title,
-					code = code
-				}
+				add_admin_script(title, description, code, id)
 			elseif book_type == BOOK_TYPES.public then
 				local id = tonumber(flow.id.caption)
 				---@cast id number
-				compiled_public_code[id] = load(code)
-				public_script_data[id] = {
-					description = description,
-					title = title,
-					code = code
-				}
+				add_public_script(title, description, code, id)
 			elseif book_type == BOOK_TYPES.admin_area then
 				local name = flow.id.caption
-				compiled_admin_area_code[name] = load(code)
-				admin_area_script_data[name] = {
-					description = description,
-					code = code
-				}
+				add_admin_area_script(name, description, code)
+			elseif book_type == BOOK_TYPES.command then
+				local name = flow.id.caption
+				add_new_command(name, description, code)
 			else -- rcon
 				local name = flow.id.caption
-				compiled_rcon_code[name] = load(code)
-				rcon_script_data[name] = {
-					description = description,
-					code = code
-				}
+				add_rcon_script(name, description, code)
 			end
 		else
 			if book_type == BOOK_TYPES.admin then
@@ -1007,6 +1124,8 @@ local GUIS = {
 				add_public_script(title, description, code)
 			elseif book_type == BOOK_TYPES.admin_area then
 				add_admin_area_script(title, description, code)
+			elseif book_type == BOOK_TYPES.command then
+				add_new_command(title, description, code)
 			else -- rcon
 				add_rcon_script(title, description, code)
 			end
@@ -1015,7 +1134,25 @@ local GUIS = {
 		switch_book(player, book_type)
 	end,
 	UB_run_code = function(element, player)
-		local is_ok, error = pcall(load(element.parent.parent.scroll_pane.UB_program_input.text), player)
+		local parent = element.parent
+		local is_command = parent.UB_is_command.state
+		local scroll_pane = parent.parent.scroll_pane
+		local code = scroll_pane.UB_program_input.text
+		local is_ok, error
+		-- TODO: change for rcon!
+		if is_command then
+			local fake_event_data = {
+				player_index = player.index,
+				tick = game.tick,
+				name = scroll_pane.UB_title.textfield.text
+			}
+			is_ok, error = pcall(
+				load("local event = " .. serpent.line(fake_event_data) .. "local player = game.get_player(event.player_index) " .. code),
+					fake_event_data, player
+				)
+		else
+			is_ok, error = pcall(load(code), player)
+		end
 		if is_ok then return end
 
 		local flow = element.parent
@@ -1138,6 +1275,14 @@ local function compile_all_text()
 	for name, data in pairs(rcon_script_data or {}) do
 		compiled_rcon_code[name] = load(data.code)
 	end
+	for name, data in pairs(custom_commands_data or {}) do
+		if data.is_added then
+			custom_commands_data[name].is_added = true
+			local f = format_command_code(data.code)
+			compiled_commands_code[name] = f
+			commands.add_command(data.name, data.description or '', f) -- Perhaps, I should do something about other cases
+		end
+	end
 end
 
 local function link_data()
@@ -1146,6 +1291,7 @@ local function link_data()
 	admin_script_data = mod_data.admin_script_data
 	admin_area_script_data = mod_data.admin_area_script_data
 	rcon_script_data = mod_data.rcon_script_data
+	custom_commands_data = mod_data.custom_commands_data
 	players_admin_area_script = mod_data.players_admin_area_script
 end
 
@@ -1156,7 +1302,8 @@ local function update_global_data()
 	mod_data.admin_script_data = mod_data.admin_script_data or {}
 	mod_data.admin_area_script_data = mod_data.admin_area_script_data or {}
 	mod_data.rcon_script_data = mod_data.rcon_script_data or {}
-	mod_data.players_admin_area_script =  {}
+	mod_data.custom_commands_data = mod_data.custom_commands_data or {}
+	mod_data.players_admin_area_script = {}
 	mod_data.last_public_id = mod_data.last_public_id or 0
 	mod_data.last_admin_id = mod_data.last_admin_id or 0
 
@@ -1191,6 +1338,21 @@ M.on_configuration_changed = function(event)
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
+	if version < 0.17 then
+		for _, data in pairs(public_script_data) do
+			data.version = data.version or "0.16.2"
+		end
+		for _, data in pairs(admin_script_data) do
+			data.version = data.version or "0.16.2"
+		end
+		for _, data in pairs(admin_area_script_data) do
+			data.version = data.version or "0.16.2"
+		end
+		for _, data in pairs(rcon_script_data) do
+			data.version = data.version or "0.16.2"
+		end
+	end
+
 	if version < 0.16 then
 		add_admin_area_script(
 			"Indestructible",
@@ -1218,6 +1380,7 @@ M.on_configuration_changed = function(event)
 			"0.15"
 		)
 	end
+
 	if version < 0.15 then
 		add_rcon_script(
 			"Print Twitch message", "",
@@ -1226,6 +1389,7 @@ M.on_configuration_changed = function(event)
 			"0.14"
 		)
 	end
+
 	if version < 0.11 then
 		add_admin_script(
 			{"scripts-titles.kill-half-enemies"},
@@ -1236,6 +1400,7 @@ M.on_configuration_changed = function(event)
 			for i=1, #entities, 2 do\
 				entities[i].destroy(raise_destroy)\
 			end',
+			nil,
 			"0.10"
 		)
 	end
@@ -1290,10 +1455,18 @@ M.add_remote_interface = function()
 			rcon_script_data[name] = nil
 			compiled_rcon_code[name] = nil
 		end,
+		delete_command = function(name)
+			if custom_commands_data[name] == nil then return end
+			if compiled_commands_code[name] then
+				compiled_commands_code[name] = nil
+			end
+			custom_commands_data[name] = nil
+		end,
 		add_admin_script = add_admin_script,
 		add_public_script = add_public_script,
 		add_admin_area_script = add_admin_area_script,
 		add_rcon_script = add_rcon_script,
+		add_new_command = add_new_command,
 		run_admin_script = function(id, player)
 			local f = compiled_public_code[id]
 			if f == nil then return end
@@ -1352,7 +1525,8 @@ M.commands = {
 			public = {},
 			admin = {},
 			admin_area = admin_area_script_data,
-			rcon = rcon_script_data
+			rcon = rcon_script_data,
+			commands = custom_commands_data
 		}
 
 		local public_data = raw_data.public
@@ -1364,11 +1538,12 @@ M.commands = {
 			admin_data[#admin_data+1] = data
 		end
 
+		local filename = "useful_book_scripts.json"
 		local json = game.table_to_json(raw_data)
-		game.write_file("useful_book_scripts.json", json, false, cmd.player_index)
+		game.write_file(filename, json, false, cmd.player_index)
 		local target = game.get_player(cmd.player_index) or game
 		-- TODO: add localization
-		target.print("Json data has been exported in ...script-output/useful_book_scripts.json")
+		target.print("All scripts has been exported in ...script-output/" .. filename)
 	end,
 	["Ubook-import"] = function(cmd)
 		import_scripts(cmd.parameter, game.get_player(cmd.player_index))
