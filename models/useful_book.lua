@@ -371,7 +371,7 @@ DEFAULT_COMMAND_TEXT = format_code(DEFAULT_COMMAND_TEXT)
 ---@return function
 function format_command_code(code, use_candran)
 	if use_candran then
-		code = candran.compile(code)
+		code = candran.make(code)
 	end
 	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
@@ -406,7 +406,7 @@ function add_admin_script(title, description, code, use_candran, id, version)
 	code = format_code(code)
 	local f
 	if use_candran then
-		f = load(candran.compile(code))
+		f = load(candran.make(code))
 	else
 		f = load(code)
 	end
@@ -439,7 +439,7 @@ function add_public_script(title, description, code, use_candran, id, version)
 	code = format_code(code)
 	local f
 	if use_candran then
-		f = load(candran.compile(code))
+		f = load(candran.make(code))
 	else
 		f = load(code)
 	end
@@ -470,7 +470,7 @@ function add_admin_area_script(name, description, code, use_candran, version)
 	code = format_code(code)
 	local f
 	if use_candran then
-		f = load(candran.compile(code))
+		f = load(candran.make(code))
 	else
 		f = load(code)
 	end
@@ -495,7 +495,7 @@ function add_rcon_script(name, description, code, use_candran, version)
 	code = format_code(code)
 	local f
 	if use_candran then
-		f = load(candran.compile(code))
+		f = load(candran.make(code))
 	else
 		f = load(code)
 	end
@@ -519,7 +519,7 @@ end
 function add_new_command(name, description, code, use_candran, version)
 	code = format_code(code)
 	if use_candran then
-		if type(load(candran.compile(code))) ~= "function" then return end
+		if type(load(candran.make(code))) ~= "function" then return end
 	else
 		if type(load(code)) ~= "function" then return end
 	end
@@ -1218,10 +1218,22 @@ local GUIS = {
 		local is_command = parent.UB_is_command.state
 		local scroll_pane = parent.parent.scroll_pane
 		local code = scroll_pane.UB_program_input.text
-		local is_ok, error
+		local is_ok, _error
 
 		if parent.UB_use_candran.state then
-			code = candran.compile(code)
+			-- For additional safety, double check
+			local _is_ok, message = pcall(candran.make, code)
+			if _is_ok then
+				code = message
+			else
+				player.print(message, RED_COLOR)
+				return
+			end
+		end
+
+		if code == nil then
+			player.print({"useful_book.empty_code_output_error"}, RED_COLOR)
+			return
 		end
 
 		-- TODO: change for rcon!
@@ -1231,20 +1243,20 @@ local GUIS = {
 				tick = game.tick,
 				name = scroll_pane.UB_title.textfield.text
 			}
-			is_ok, error = pcall(
+			is_ok, _error = pcall(
 				load("local event = " .. serpent.line(fake_event_data) ..
 					"local player = game.get_player(event.player_index) " .. code
 				)
 			)
 		else
-			is_ok, error = pcall(load(code), player)
+			is_ok, _error = pcall(load(code), player)
 		end
 		if is_ok then return end
 
 		local flow = element.parent
 		local main_frame = flow.parent
 		local error_message = main_frame.error_message
-		error_message.caption = error
+		error_message.caption = _error
 		error_message.visible = true
 		flow.UB_add_code.visible = false
 		element.name = "UB_check_code"
@@ -1257,7 +1269,18 @@ local GUIS = {
 		local main_frame = flow.parent
 		local code = main_frame.scroll_pane.UB_program_input.text
 		if flow.UB_use_candran.state then
-			code = candran.compile(code)
+			local is_ok, message = pcall(candran.make, code)
+			if is_ok then
+				code = message
+			else
+				player.print(message, RED_COLOR)
+				return
+			end
+		end
+
+		if code == nil then
+			player.print({"useful_book.empty_code_output_error"}, RED_COLOR)
+			return
 		end
 
 		local f = load(code)
@@ -1357,28 +1380,28 @@ local function compile_all_text()
 	for id, data in pairs(admin_script_data or {}) do
 		local code = data.code
 		if data.use_candran then
-			code = candran.compile(code)
+			code = candran.make(code)
 		end
 		compiled_admin_code[id] = load(code)
 	end
 	for id, data in pairs(public_script_data or {}) do
 		local code = data.code
 		if data.use_candran then
-			code = candran.compile(code)
+			code = candran.make(code)
 		end
 		compiled_public_code[id] = load(code)
 	end
 	for name, data in pairs(admin_area_script_data or {}) do
 		local code = data.code
 		if data.use_candran then
-			code = candran.compile(code)
+			code = candran.make(code)
 		end
 		compiled_admin_area_code[name] = load(code)
 	end
 	for name, data in pairs(rcon_script_data or {}) do
 		local code = data.code
 		if data.use_candran then
-			code = candran.compile(code)
+			code = candran.make(code)
 		end
 		compiled_rcon_code[name] = load(code)
 	end

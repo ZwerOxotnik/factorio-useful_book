@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.18.1
+Date: 24. 08. 2022
+  Changes:
+    - Improved interactions with candran
+  Bugfixes:
+    - Made safer to compile with candran if there are errors with candran
+---------------------------------------------------------------------------------------------------
 Version: 0.18.0
 Date: 24. 08. 2022
   Major Features:
