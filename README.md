@@ -47,7 +47,7 @@
 Useful book
 -----------
 
-Store and use any script in the book. Admins can share access to an executable code to players.
+Store and use any script in the book or create custom commands ("candran" preprocessor is optional). Admins can share access to an executable code to players.
 
 It's more practical than "Lua Compiler" mod.
 

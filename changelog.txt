@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.18.0
+Date: 24. 08. 2022
+  Major Features:
+    - Added support of candran (see https://github.com/ZwerOxotnik/zk-lib for details) (access via "candran" variable)
+  Changes:
+    - Improved data consistency between versions
+---------------------------------------------------------------------------------------------------
 Version: 0.17.1
 Date: 23. 08. 2022
   Changes:
@@ -19,7 +26,7 @@ Date: 22. 08. 2022
     - Fixed switching of code editor (it crushed for some scripts)
   Changes:
     - Saves mod version in export
-    - Added new library for scripts (see https://github.com/luafun/luafun ) (access via "fun")
+    - Added new library for scripts (see https://github.com/luafun/luafun ) (access via "fun" variable)
   Locale:
     - Added German translation (thanks to @Xman1109 on crowdin)
     - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)

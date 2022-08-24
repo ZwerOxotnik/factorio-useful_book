@@ -2,7 +2,8 @@
 local M = {}
 
 
-fun = require("lualib/fun")
+fun = require("__zk-lib__/lualib/fun")
+candran = require("__zk-lib__/lualib/candran/candran")
 
 
 is_server = false -- this is for rcon
@@ -42,7 +43,7 @@ local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
 local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(game.table_to_json(global.my_data))"
 local DEFAULT_ADMIN_AREA_TEXT = "local area, player, entities = ...\n"
 local DEFAULT_COMMAND_TEXT = [[
-if event.player_index == 0 then -- stop this command if we got it via server console/rcon 
+if event.player_index == 0 then -- stop this command if we got it via server console/rcon
 	print({"prohibited-server-command"})
 	return
 end
@@ -129,19 +130,19 @@ function import_scripts(json, player)
 	end
 
 	for _, data in pairs(raw_data.public or {}) do
-		add_public_script(data.title, data.descripton, data.code, nil, data.version)
+		add_public_script(data.title, data.descripton, data.code, data.use_candran, nil, data.version or "0.16.2")
 	end
 	for _, data in pairs(raw_data.admin or {}) do
-		add_admin_script(data.title, data.descripton, data.code, nil, data.version)
+		add_admin_script(data.title, data.descripton, data.code, data.use_candran, nil, data.version or "0.16.2")
 	end
 	for name, data in pairs(raw_data.admin_area or {}) do
-		add_admin_area_script(name, data.descripton, data.code, data.version)
+		add_admin_area_script(name, data.descripton, data.code, data.use_candran, data.version or "0.16.2")
 	end
 	for name, data in pairs(raw_data.rcon or {}) do
-		add_rcon_script(name, data.descripton, data.code, data.version)
+		add_rcon_script(name, data.descripton, data.code, data.use_candran, data.version or "0.16.2")
 	end
 	for name, data in pairs(raw_data.commands or {}) do
-		add_new_command(name, data.descripton, data.code, data.version)
+		add_new_command(name, data.descripton, data.code, data.use_candran, data.version or "0.16.2")
 	end
 
 	-- TODO: add localization
@@ -220,7 +221,8 @@ function reset_scripts()
 	add_admin_script(
 		{"scripts-titles.reveal-gen-map"},
 		{"scripts-description.reveal-gen-map"},
-		"local player = ...\nplayer.force.chart_all()"
+		"local player = ...\nplayer.force.chart_all()",
+		false
 	)
 	add_admin_script(
 		{"scripts-titles.kill-all-enemies"},
@@ -230,7 +232,8 @@ function reset_scripts()
 		local entities = player.surface.find_entities_filtered({force="enemy"})\
 		for i=1, #entities do\
 			entities[i].destroy(raise_destroy)\
-		end'
+		end',
+		false
 	)
 	add_admin_script(
 		{"scripts-titles.kill-half-enemies"},
@@ -240,7 +243,8 @@ function reset_scripts()
 		local entities = player.surface.find_entities_filtered({force="enemy"})\
 		for i=1, #entities, 2 do\
 			entities[i].destroy(raise_destroy)\
-		end'
+		end',
+		false
 	)
 	add_admin_script(
 		{"scripts-titles.reg-resources"},
@@ -267,12 +271,14 @@ function reset_scripts()
 		entities = surface.find_entities_filtered{type="mining-drill"}\
 		for i=1, #entities do\
 			entities[i].update_connections()\
-		end'
+		end',
+		false
 	)
 	add_rcon_script(
 		"Print Twitch message", "",
 		'local username, message = ...\
-		game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})'
+		game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})',
+		false
 	)
 	add_admin_area_script(
 		"Indestructible",
@@ -283,7 +289,8 @@ function reset_scripts()
 			if entity.valid then\
 				entity.destructible = false\
 			end\
-		end'
+		end',
+		false
 	)
 	add_admin_area_script(
 		"Destroy",
@@ -295,7 +302,8 @@ function reset_scripts()
 			if entity.valid and not entity.is_player() then\
 				entity.destroy(raise_destroy)\
 			end\
-		end'
+		end',
+		false
 	)
 	for _, player in pairs(game.players) do
 		if player.valid and player.admin then
@@ -359,8 +367,12 @@ DEFAULT_COMMAND_TEXT = format_code(DEFAULT_COMMAND_TEXT)
 
 
 ---@param code string
+---@param use_candran boolean
 ---@return function
-function format_command_code(code)
+function format_command_code(code, use_candran)
+	if use_candran then
+		code = candran.compile(code)
+	end
 	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
 	-- Should I prohibit access to some global variables
@@ -386,12 +398,18 @@ end
 ---@param title string|LocalisedString
 ---@param description? string|LocalisedString
 ---@param code string
+---@param use_candran boolean
 ---@param id number?
 ---@param version string?
 ---@return integer? #id
-function add_admin_script(title, description, code, id, version)
+function add_admin_script(title, description, code, use_candran, id, version)
 	code = format_code(code)
-	local f = load(code)
+	local f
+	if use_candran then
+		f = load(candran.compile(code))
+	else
+		f = load(code)
+	end
 	if type(f) ~= "function" then return end
 
 	if id == nil then
@@ -403,6 +421,7 @@ function add_admin_script(title, description, code, id, version)
 		description = description,
 		title = title,
 		code = code,
+		use_candran = use_candran or false,
 		version = version or script.active_mods.useful_book
 	}
 	return id
@@ -412,12 +431,18 @@ end
 ---@param title string|LocalisedString
 ---@param description? string|LocalisedString
 ---@param code string
+---@param use_candran boolean
 ---@param id number?
 ---@param version string?
 ---@return integer? #id
-function add_public_script(title, description, code, id, version)
+function add_public_script(title, description, code, use_candran, id, version)
 	code = format_code(code)
-	local f = load(code)
+	local f
+	if use_candran then
+		f = load(candran.compile(code))
+	else
+		f = load(code)
+	end
 	if type(f) ~= "function" then return end
 
 	if id == nil then
@@ -429,6 +454,7 @@ function add_public_script(title, description, code, id, version)
 		description = description,
 		title = title,
 		code = code,
+		use_candran = use_candran or false,
 		version = version or script.active_mods.useful_book
 	}
 	return id
@@ -438,16 +464,23 @@ end
 ---@param name string
 ---@param description? string
 ---@param code string
+---@param use_candran boolean
 ---@param version string?
-function add_admin_area_script(name, description, code, version)
+function add_admin_area_script(name, description, code, use_candran, version)
 	code = format_code(code)
-	local f = load(code)
+	local f
+	if use_candran then
+		f = load(candran.compile(code))
+	else
+		f = load(code)
+	end
 	if type(f) ~= "function" then return end
 
 	compiled_admin_area_code[name] = f
 	admin_area_script_data[name] = {
 		description = description,
 		code = code,
+		use_candran = use_candran or false,
 		version = version or script.active_mods.useful_book
 	}
 end
@@ -456,16 +489,23 @@ end
 ---@param name string
 ---@param description? string
 ---@param code string
+---@param use_candran boolean
 ---@param version string?
-function add_rcon_script(name, description, code, version)
+function add_rcon_script(name, description, code, use_candran, version)
 	code = format_code(code)
-	local f = load(code)
+	local f
+	if use_candran then
+		f = load(candran.compile(code))
+	else
+		f = load(code)
+	end
 	if type(f) ~= "function" then return end
 
 	compiled_rcon_code[name] = f
 	rcon_script_data[name] = {
 		description = description,
 		code = code,
+		use_candran = use_candran or false,
 		version = version or script.active_mods.useful_book
 	}
 end
@@ -474,19 +514,25 @@ end
 ---@param name string
 ---@param description? string
 ---@param code string
+---@param use_candran boolean
 ---@param version string?
-function add_new_command(name, description, code, version)
+function add_new_command(name, description, code, use_candran, version)
 	code = format_code(code)
-	if type(load(code)) ~= "function" then return end
+	if use_candran then
+		if type(load(candran.compile(code))) ~= "function" then return end
+	else
+		if type(load(code)) ~= "function" then return end
+	end
 
 	custom_commands_data[name] = {
 		description = description,
 		code = code,
+		use_candran = use_candran or false,
 		version = version or script.active_mods.useful_book
 	}
 	if not commands.commands[name] and not commands.game_commands[name] then
 		custom_commands_data[name].is_added = true
-		local f = format_command_code(code)
+		local f = format_command_code(code, use_candran)
 		compiled_commands_code[name] = f
 		commands.add_command(name, description or '', f)
 	else
@@ -562,10 +608,24 @@ function switch_code_editor(player, book_type, id)
 	content.name = "UB_add_code"
 	content.sprite = "plus_white"
 	flow.add(content).visible = false
+
 	if book_type ~= BOOK_TYPES.rcon and book_type ~= BOOK_TYPES.admin_area and book_type ~= BOOK_TYPES.command then
-		flow.add{type = "label", caption = {'', {"useful_book.is_public_script"}, COLON}}
+		flow.add(LABEL).caption = {'', {"useful_book.is_public_script"}, COLON}
 	end
 	local UB_is_public_script = flow.add{type = "checkbox", name = "UB_is_public_script", state = (book_type == BOOK_TYPES.public), enabled = id and false}
+
+	-- TODO: add localization
+	local label = flow.add(LABEL)
+	label.caption = {'', 'Use candran', COLON}
+	local candran_tooltip = {'', "See https://github.com/Reuh/candran and https://github.com/ZwerOxotnik/zk-lib for details"}
+	label.tooltip = candran_tooltip
+	flow.add{
+		type = "checkbox",
+		name = "UB_use_candran",
+		state = data and data.use_candran or false,
+		tooltip = candran_tooltip
+	}
+
 	if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area or book_type == BOOK_TYPES.command then
 		UB_is_public_script.visible = false
 	end
@@ -913,6 +973,24 @@ local function on_gui_text_changed(event)
 	if not (element and element.valid) then return end
 	if element.name ~= "UB_program_input" then return end
 
+	--TODO: refactor
+	local button = element.parent.parent.buttons_row.UB_run_code
+	if button then
+		button.name = "UB_check_code"
+		button.sprite = "refresh"
+		button.hovered_sprite = ''
+		button.clicked_sprite = ''
+		button = element.parent.parent.buttons_row.UB_add_code
+		button.visible = false
+	end
+end
+
+local function on_gui_checked_state_changed(event)
+	local element = event.element
+	if not (element and element.valid) then return end
+	if element.name ~= "UB_use_candran" then return end
+
+	--TODO: refactor
 	local button = element.parent.parent.buttons_row.UB_run_code
 	if button then
 		button.name = "UB_check_code"
@@ -1084,6 +1162,8 @@ local GUIS = {
 		local UB_is_rcon_script = flow.UB_is_rcon_script
 		local UB_is_admin_area_script = flow.UB_is_admin_area_script
 		local UB_is_command = flow.UB_is_command
+		local use_candran = flow.UB_use_candran.state
+		---@cast use_candran boolean
 		local book_type
 		if UB_is_public_script.state then
 			book_type = BOOK_TYPES.public
@@ -1102,32 +1182,32 @@ local GUIS = {
 			if book_type == BOOK_TYPES.admin then
 				local id = tonumber(flow.id.caption)
 				---@cast id number
-				add_admin_script(title, description, code, id)
+				add_admin_script(title, description, code, use_candran, id)
 			elseif book_type == BOOK_TYPES.public then
 				local id = tonumber(flow.id.caption)
 				---@cast id number
-				add_public_script(title, description, code, id)
+				add_public_script(title, description, code, use_candran, id)
 			elseif book_type == BOOK_TYPES.admin_area then
 				local name = flow.id.caption
-				add_admin_area_script(name, description, code)
+				add_admin_area_script(name, description, code, use_candran)
 			elseif book_type == BOOK_TYPES.command then
 				local name = flow.id.caption
-				add_new_command(name, description, code)
+				add_new_command(name, description, code, use_candran)
 			else -- rcon
 				local name = flow.id.caption
-				add_rcon_script(name, description, code)
+				add_rcon_script(name, description, code, use_candran)
 			end
 		else
 			if book_type == BOOK_TYPES.admin then
-				add_admin_script(title, description, code)
+				add_admin_script(title, description, code, use_candran)
 			elseif book_type == BOOK_TYPES.public then
-				add_public_script(title, description, code)
+				add_public_script(title, description, code, use_candran)
 			elseif book_type == BOOK_TYPES.admin_area then
-				add_admin_area_script(title, description, code)
+				add_admin_area_script(title, description, code, use_candran)
 			elseif book_type == BOOK_TYPES.command then
-				add_new_command(title, description, code)
+				add_new_command(title, description, code, use_candran)
 			else -- rcon
-				add_rcon_script(title, description, code)
+				add_rcon_script(title, description, code, use_candran)
 			end
 		end
 		element.parent.parent.destroy()
@@ -1139,6 +1219,11 @@ local GUIS = {
 		local scroll_pane = parent.parent.scroll_pane
 		local code = scroll_pane.UB_program_input.text
 		local is_ok, error
+
+		if parent.UB_use_candran.state then
+			code = candran.compile(code)
+		end
+
 		-- TODO: change for rcon!
 		if is_command then
 			local fake_event_data = {
@@ -1147,9 +1232,10 @@ local GUIS = {
 				name = scroll_pane.UB_title.textfield.text
 			}
 			is_ok, error = pcall(
-				load("local event = " .. serpent.line(fake_event_data) .. "local player = game.get_player(event.player_index) " .. code),
-					fake_event_data, player
+				load("local event = " .. serpent.line(fake_event_data) ..
+					"local player = game.get_player(event.player_index) " .. code
 				)
+			)
 		else
 			is_ok, error = pcall(load(code), player)
 		end
@@ -1169,7 +1255,12 @@ local GUIS = {
 	UB_check_code = function(element, player)
 		local flow = element.parent
 		local main_frame = flow.parent
-		local f = load(main_frame.scroll_pane.UB_program_input.text)
+		local code = main_frame.scroll_pane.UB_program_input.text
+		if flow.UB_use_candran.state then
+			code = candran.compile(code)
+		end
+
+		local f = load(code)
 		if type(f) == "function" then
 			if flow.UB_is_rcon_script.state == false then
 				element.name = "UB_run_code"
@@ -1264,21 +1355,37 @@ end
 
 local function compile_all_text()
 	for id, data in pairs(admin_script_data or {}) do
-		compiled_admin_code[id] = load(data.code)
+		local code = data.code
+		if data.use_candran then
+			code = candran.compile(code)
+		end
+		compiled_admin_code[id] = load(code)
 	end
 	for id, data in pairs(public_script_data or {}) do
-		compiled_public_code[id] = load(data.code)
+		local code = data.code
+		if data.use_candran then
+			code = candran.compile(code)
+		end
+		compiled_public_code[id] = load(code)
 	end
 	for name, data in pairs(admin_area_script_data or {}) do
-		compiled_admin_area_code[name] = load(data.code)
+		local code = data.code
+		if data.use_candran then
+			code = candran.compile(code)
+		end
+		compiled_admin_area_code[name] = load(code)
 	end
 	for name, data in pairs(rcon_script_data or {}) do
-		compiled_rcon_code[name] = load(data.code)
+		local code = data.code
+		if data.use_candran then
+			code = candran.compile(code)
+		end
+		compiled_rcon_code[name] = load(code)
 	end
 	for name, data in pairs(custom_commands_data or {}) do
 		if data.is_added then
 			custom_commands_data[name].is_added = true
-			local f = format_command_code(data.code)
+			local f = format_command_code(data.code, data.use_candran)
 			compiled_commands_code[name] = f
 			commands.add_command(data.name, data.description or '', f) -- Perhaps, I should do something about other cases
 		end
@@ -1338,6 +1445,24 @@ M.on_configuration_changed = function(event)
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
+	if version < 0.18 then
+		for _, data in pairs(public_script_data) do
+			data.use_candran = false
+		end
+		for _, data in pairs(admin_script_data) do
+			data.use_candran = false
+		end
+		for _, data in pairs(admin_area_script_data) do
+			data.use_candran = false
+		end
+		for _, data in pairs(rcon_script_data) do
+			data.use_candran = false
+		end
+		for _, data in pairs(custom_commands_data) do
+			data.use_candran = false
+		end
+	end
+
 	if version < 0.17 then
 		for _, data in pairs(public_script_data) do
 			data.version = data.version or "0.16.2"
@@ -1364,6 +1489,7 @@ M.on_configuration_changed = function(event)
 					entity.destructible = false\
 				end\
 			end',
+			false,
 			"0.15"
 		)
 		add_admin_area_script(
@@ -1377,6 +1503,7 @@ M.on_configuration_changed = function(event)
 					entity.destroy(raise_destroy)\
 				end\
 			end',
+			false,
 			"0.15"
 		)
 	end
@@ -1386,6 +1513,7 @@ M.on_configuration_changed = function(event)
 			"Print Twitch message", "",
 			'local username, message = ...\
 			game.print({"", "[color=purple][Twitch][/color] ", username, {"colon"}, " ", message})',
+			false,
 			"0.14"
 		)
 	end
@@ -1400,6 +1528,7 @@ M.on_configuration_changed = function(event)
 			for i=1, #entities, 2 do\
 				entities[i].destroy(raise_destroy)\
 			end',
+			false,
 			nil,
 			"0.10"
 		)
@@ -1503,6 +1632,7 @@ local DROP_DOWN_GUIS_FUNCS = {
 M.events = {
 	[defines.events.on_gui_click] = on_gui_click,
 	[defines.events.on_gui_text_changed] = on_gui_text_changed,
+	[defines.events.on_gui_checked_state_changed] = on_gui_checked_state_changed,
 	[defines.events.on_player_created] = on_player_created,
 	[defines.events.on_player_joined_game] = destroy_GUI_event,
 	[defines.events.on_player_left_game] = destroy_GUI_event,
