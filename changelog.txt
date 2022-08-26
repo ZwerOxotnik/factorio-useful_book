@@ -1,4 +1,18 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.19.0
+Date: 26. 08. 2022
+  Major Features:
+    - Added support of teal (see https://github.com/ZwerOxotnik/zk-lib for details) (access via "tl" variable)
+  Changes:
+    - Refactored some code
+    - Added 2 new commands: /tl /candran for executing code by admins
+    - Changed API slightly (I should improve remote interface)
+  Bugfixes:
+    - Removed unnecessary lua output in custom commands after player's executions
+    - Fixed loading of commands for saves
+    - Fixed changing of custom commands (bug from 0.17.0)
+    - Corrected default command code
+---------------------------------------------------------------------------------------------------
 Version: 0.18.1
 Date: 24. 08. 2022
   Changes:
