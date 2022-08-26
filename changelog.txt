@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.19.1
+Date: 26. 08. 2022
+  Bugfixes:
+    - Improved data consistency for custom commands
+---------------------------------------------------------------------------------------------------
 Version: 0.19.0
 Date: 26. 08. 2022
   Major Features:
@@ -11,7 +16,7 @@ Date: 26. 08. 2022
     - Removed unnecessary lua output in custom commands after player's executions
     - Fixed loading of commands for saves
     - Fixed changing of custom commands (bug from 0.17.0)
-    - Corrected default command code
+    - Corrected default custom command code
 ---------------------------------------------------------------------------------------------------
 Version: 0.18.1
 Date: 24. 08. 2022

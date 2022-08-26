@@ -662,8 +662,10 @@ function switch_code_editor(player, book_type, id)
 			data = admin_area_script_data[id]
 		elseif book_type == BOOK_TYPES.command then
 			data = custom_commands_data[id]
-			commands.remove_command(id)
-			data.is_added = false
+			if data.is_added then
+				commands.remove_command(id)
+				data.is_added = false
+			end
 		else -- rcon
 			data = rcon_script_data[id]
 		end
@@ -1158,10 +1160,15 @@ local GUIS = {
 	end,
 	UB_delete_custom_command = function(element, player)
 		local name = element.parent.name
-		commands.remove_command(name)
-		custom_commands_data[name] = nil
-		if compiled_commands_code[name] then -- there's something weird about Factorio lua, so I shouldn't nil twice
-			compiled_commands_code[name] = nil
+		data = custom_commands_data[name]
+		if data then
+			if data.is_added then
+				commands.remove_command(name)
+			end
+			custom_commands_data[name] = nil
+			if compiled_commands_code[name] then -- there's something weird about Factorio lua, so I shouldn't nil twice
+				compiled_commands_code[name] = nil
+			end
 		end
 		local flow = element.parent
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
