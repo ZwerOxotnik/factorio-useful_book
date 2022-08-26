@@ -3,6 +3,10 @@ local M = {}
 
 
 fun = require("__zk-lib__/lualib/fun")
+basexx = require("__zk-lib__/lualib/basexx")
+bitwise = require("__zk-lib__/lualib/bitwise")
+Locale = require("__zk-lib__/static-libs/lualibs/locale")
+Version = require("__zk-lib__/static-libs/lualibs/version")
 candran = require("__zk-lib__/lualib/candran/candran")
 tl = require("__zk-lib__/lualib/tl/0.14.1/tl")
 

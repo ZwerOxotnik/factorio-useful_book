@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.19.2
+Date: 26. 08. 2022
+  Bugfixes:
+    - Fixed dependencies
+  Changes:
+    - Add access to other libraries ("basexx", "bitwise", "Locale", "Version" variables)
+---------------------------------------------------------------------------------------------------
 Version: 0.19.1
 Date: 26. 08. 2022
   Bugfixes:
