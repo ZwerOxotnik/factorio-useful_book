@@ -1,10 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.19.3
+Date: 28. 08. 2022
+  Locale:
+    - Added German translation (thanks to @knnide (knniDE) on crowdin)
+    - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
+---------------------------------------------------------------------------------------------------
 Version: 0.19.2
 Date: 26. 08. 2022
   Bugfixes:
     - Fixed dependencies
   Changes:
-    - Add access to other libraries ("basexx", "bitwise", "Locale", "Version" variables)
+    - Added access to other libraries ("basexx", "bitwise", "Locale", "Version" variables)
 ---------------------------------------------------------------------------------------------------
 Version: 0.19.1
 Date: 26. 08. 2022
