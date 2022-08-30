@@ -1323,19 +1323,26 @@ local GUIS = {
 		local is_ok, _error
 
 		if compiler_id == COMPILER_IDS.candran_v1_0_0 then
-			local _is_ok, message = pcall(candran.make, code)
+			local _is_ok, result = pcall(candran.make, code)
 			if _is_ok then
-				code = message
+				code = result
 			else
-				player.print(message, RED_COLOR)
+				player.print(result, RED_COLOR)
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
-			local _is_ok, message = pcall(tl.gen, code)
+			local _is_ok, result = pcall(tl.gen, code)
 			if _is_ok then
-				code = message
+				-- It should be improved somehow
+				local __is_ok, __message = tl.load(code)
+				if __is_ok then
+					code = result
+				else
+					player.print(__message, RED_COLOR)
+					return
+				end
 			else
-				player.print(message, RED_COLOR)
+				player.print(result, RED_COLOR)
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.moonscript then
@@ -1387,19 +1394,26 @@ local GUIS = {
 		local code = main_frame.scroll_pane.UB_program_input.text
 		local compiler_id = flow.UB_compiler_id.selected_index
 		if compiler_id == COMPILER_IDS.candran_v1_0_0 then
-			local is_ok, message = pcall(candran.make, code)
+			local is_ok, result = pcall(candran.make, code)
 			if is_ok then
-				code = message
+				code = result
 			else
-				player.print(message, RED_COLOR)
+				player.print(result, RED_COLOR)
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
-			local is_ok, message = pcall(tl.gen, code)
-			if is_ok then
-				code = message
+			local _is_ok, result = pcall(tl.gen, code)
+			if _is_ok then
+				-- It should be improved somehow
+				local __is_ok, __message = tl.load(code)
+				if __is_ok then
+					code = result
+				else
+					player.print(__message, RED_COLOR)
+					return
+				end
 			else
-				player.print(message, RED_COLOR)
+				player.print(result, RED_COLOR)
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.moonscript then
