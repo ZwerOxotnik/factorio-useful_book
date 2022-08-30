@@ -7,9 +7,13 @@ basexx = require("__zk-lib__/lualib/basexx")
 bitwise = require("__zk-lib__/lualib/bitwise")
 Locale = require("__zk-lib__/static-libs/lualibs/locale")
 Version = require("__zk-lib__/static-libs/lualibs/version")
+
+--#region Compilers
 candran = require("__zk-lib__/lualib/candran/candran")
 tl = require("__zk-lib__/lualib/tl/0.14.1/tl")
-
+-- Perhaps, I've missed something in moonscript
+moonscript = require("__zk-lib__/lualib/moonscript/base")
+--#endregion
 
 is_server = false -- this is for rcon
 
@@ -93,12 +97,14 @@ local SCRIPTS_BY_ID = { -- scripts which identified by id
 local COMPILER_IDS = {
 	lua = 1,
 	candran_v1_0_0 = 2,
-	teal_v0_14_1 = 3
+	teal_v0_14_1 = 3,
+	moonscript = 4,
 }
 local COMPILER_NAMES = {
 	[COMPILER_IDS.lua] = "lua",
 	[COMPILER_IDS.candran_v1_0_0] = "candran v1.0.0",
-	[COMPILER_IDS.teal_v0_14_1] = "teal v0.14.1"
+	[COMPILER_IDS.teal_v0_14_1] = "teal v0.14.1",
+	[COMPILER_IDS.moonscript] = "moonscript dev"
 }
 --#endregion
 
@@ -443,6 +449,8 @@ function format_command_code(code, compiler_id)
 		code = candran.make(code)
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		code = tl.gen(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		code = moonscript.to_lua(code)
 	end
 	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
@@ -481,6 +489,8 @@ function add_admin_script(title, description, code, compiler_id, id, version)
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		f = tl.load(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return end
 
@@ -516,6 +526,8 @@ function add_public_script(title, description, code, compiler_id, id, version)
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		f = tl.load(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return end
 
@@ -550,6 +562,8 @@ function add_admin_area_script(name, description, code, compiler_id, version)
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		f = tl.load(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return false end
 
@@ -579,6 +593,8 @@ function add_rcon_script(name, description, code, compiler_id, version)
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		f = tl.load(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return false end
 
@@ -603,6 +619,8 @@ function add_new_command(name, description, code, compiler_id, version)
 	code = format_code(code)
 	if compiler_id == COMPILER_IDS.lua then
 		if type(load(code)) ~= "function" then return false, false end
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		if type(moonscript.loadstring(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
 		if type(tl.load(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
@@ -1320,6 +1338,14 @@ local GUIS = {
 				player.print(message, RED_COLOR)
 				return
 			end
+		elseif compiler_id == COMPILER_IDS.moonscript then
+			local lua_code, message = moonscript.to_lua(code)
+			if lua_code then
+				code = lua_code
+			else
+				player.print(message, RED_COLOR)
+				return
+			end
 		end
 
 		if code == nil then
@@ -1372,6 +1398,14 @@ local GUIS = {
 			local is_ok, message = pcall(tl.gen, code)
 			if is_ok then
 				code = message
+			else
+				player.print(message, RED_COLOR)
+				return
+			end
+		elseif compiler_id == COMPILER_IDS.moonscript then
+			local lua_code, message = moonscript.to_lua(code)
+			if lua_code then
+				code = lua_code
 			else
 				player.print(message, RED_COLOR)
 				return
@@ -1490,6 +1524,8 @@ local function compile_script_data(script_data, compiled_script_data)
 			compiled_script_data[id] = load(code)
 		elseif data.compiler_id == COMPILER_IDS.teal_v0_14_1 then
 			compiled_script_data[id] = tl.load(code)
+		elseif data.compiler_id == COMPILER_IDS.moonscript then
+			compiled_script_data[id] = moonscript.loadstring(code)
 		end
 	end
 end
