@@ -47,7 +47,7 @@
 Useful book
 -----------
 
-Store and use any script in Lua/Candran/Teal or create custom commands. Admins can share access to an executable code to players.
+Store and use any script in Lua/Candran/Teal/MoonScript or create custom commands. Admins can share access to an executable code to players.
 
 It's more practical than "Lua Compiler" mod.
 
