@@ -1,4 +1,10 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.19.6
+Date: 04. 09. 2022
+  Locale:
+    - Updated German translation (thanks to @knnide (knniDE) on crowdin)
+    - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
+---------------------------------------------------------------------------------------------------
 Version: 0.19.5
 Date: 30. 08. 2022
   Changes:
