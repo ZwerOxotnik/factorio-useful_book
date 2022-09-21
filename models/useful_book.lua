@@ -1551,10 +1551,18 @@ local function compile_all_text()
 	compile_script_data(rcon_script_data, compiled_rcon_code)
 	for name, data in pairs(custom_commands_data or {}) do
 		if data.is_added then
-			custom_commands_data[name].is_added = true
-			local f = format_command_code(data.code, data.compiler_id)
-			compiled_commands_code[name] = f
-			commands.add_command(name, data.description or '', f) -- Perhaps, I should do something about other cases
+			if game and not (commands.commands[name] or commands.game_commands[name]) then
+				data.is_added = true
+				local f = format_command_code(data.code, data.compiler_id)
+				compiled_commands_code[name] = f
+				commands.add_command(name, data.description or '', f) -- Perhaps, I should do something about other cases
+			elseif game == nil then
+				local f = format_command_code(data.code, data.compiler_id)
+				compiled_commands_code[name] = f
+				commands.add_command(name, data.description or '', f) -- Perhaps, I should do something about other cases
+			else
+				data.is_added = false
+			end
 		end
 	end
 end
