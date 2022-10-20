@@ -15,6 +15,7 @@ tl = require("__zk-lib__/lualib/tl/0.14.1/tl")
 moonscript = require("__zk-lib__/lualib/moonscript/base")
 --#endregion
 
+
 is_server = false -- this is for rcon
 
 
@@ -30,6 +31,8 @@ local admin_area_script_data
 local rcon_script_data
 ---@type table<string, table>
 local custom_commands_data
+---@type table<integer, table<string, table>>
+local custom_events_data
 ---@type table<integer, string>
 local players_admin_area_script
 --#endregion
@@ -44,6 +47,8 @@ local compiled_admin_area_code = {}
 local compiled_rcon_code = {}
 ---@type table<string, function>
 local compiled_commands_code = {}
+---@type table<integer, table<string, function>>
+local compiled_custom_events_data = {}
 
 
 --#region Constants
@@ -51,6 +56,7 @@ local print_to_rcon = rcon.print
 local DEFAULT_TEXT = "local player = ...\nplayer.print(player.name)"
 local DEFAULT_RCON_TEXT = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(game.table_to_json(global.my_data))"
 local DEFAULT_ADMIN_AREA_TEXT = "local area, player, entities = ...\n"
+local DEFAULT_CUSTOM_EVENT_TEXT = "local event, player = ...\n"
 local DEFAULT_COMMAND_TEXT = [[
 if event.player_index == 0 then -- stop this command if we got it via server console/rcon
 	player.print({"prohibited-server-command"})
@@ -81,14 +87,16 @@ local BOOK_TYPES = {
 	public = 2,
 	rcon = 3,
 	admin_area = 4,
-	command = 5
+	command = 5,
+	custom_event = 6
 }
 local BOOK_TITLES = {
 	[BOOK_TYPES.admin] = {"useful_book.admin_scripts"},
 	[BOOK_TYPES.public] = {"useful_book.public_scripts"},
 	[BOOK_TYPES.rcon] = {"useful_book.rcon_scripts"},
 	[BOOK_TYPES.admin_area] = {"useful_book.admin_area_scripts"},
-	[BOOK_TYPES.command] = {"useful_book.custom_commands"}
+	[BOOK_TYPES.command] = {"useful_book.custom_commands"},
+	[BOOK_TYPES.custom_event] = {"useful_book.custom_events"}
 }
 local SCRIPTS_BY_ID = { -- scripts which identified by id
 	[BOOK_TYPES.admin] = true,
@@ -106,6 +114,10 @@ local COMPILER_NAMES = {
 	[COMPILER_IDS.teal_v0_14_1] = "teal v0.14.1",
 	[COMPILER_IDS.moonscript] = "moonscript dev"
 }
+local EVENTS_NAMES = {}
+for name in pairs(defines.events) do
+	EVENTS_NAMES[#EVENTS_NAMES+1] = name
+end
 --#endregion
 
 
@@ -185,6 +197,11 @@ function import_scripts(json, player)
 		fix_old_data(data)
 		add_rcon_script(name, data.descripton, data.code, data.compiler_id, data.version or "0.16.2")
 	end
+	for event_name, _custom_events_data in pairs(raw_data.custom_events or {}) do
+		for name, data in pairs(_custom_events_data) do
+			add_custom_event_script(event_name, name, data.descripton, data.code, data.compiler_id, data.version)
+		end
+	end
 	for name, data in pairs(raw_data.commands or {}) do
 		fix_old_data(data)
 		add_new_command(name, data.descripton, data.code, data.compiler_id, data.version or "0.16.2")
@@ -193,6 +210,62 @@ function import_scripts(json, player)
 	-- TODO: add localization
 	target.print("Scripts has been imported for \"useful book\"")
 	return true
+end
+
+
+---@param event_id integer
+local function add_custom_event(event_id)
+	compiled_custom_events_data[event_id] = compiled_custom_events_data[event_id] or {}
+	local compiled_N_custom_events = compiled_custom_events_data[event_id]
+
+	local is_default_event = (M.events[event_id] ~= nil)
+	if is_default_event == true then return end
+	local is_handled = (script.get_event_handler(event_id) ~= nil)
+	if is_handled then return end
+
+	script.on_event(event_id, function(event)
+		local player
+		if event.player_index and event.player_index > 0 then
+			player = game.get_player(event.player_index)
+		end
+		for _, _f in pairs(compiled_N_custom_events) do
+			local is_ok, error = pcall(_f, event, player)
+			if not is_ok then
+				game.print(error, RED_COLOR)
+			end
+		end
+	end)
+end
+
+
+---Use it on predefined events
+local function execute_custom_event(event, player)
+	local compiled_N_custom_events = compiled_custom_events_data[event.name]
+	if compiled_N_custom_events == nil then return end
+	for _, _f in pairs(compiled_N_custom_events) do
+		local is_ok, error = pcall(_f, event, player)
+		if not is_ok then
+			game.print(error, RED_COLOR)
+		end
+	end
+end
+
+
+---@param event_id integer
+---@param name string
+local function delete_custom_event(event_id, name)
+	local is_default_event = (M.events[event_id] ~= nil)
+	local compiled_N_custom_events = compiled_custom_events_data[event_id]
+	if compiled_N_custom_events == nil then return end
+	if compiled_N_custom_events[name] then -- Perhaps, it's excessive, but it's better to be safe
+		compiled_N_custom_events[name] = nil
+	end
+	if next(compiled_N_custom_events) == nil then
+		compiled_custom_events_data[event_id] = nil
+	end
+	if is_default_event == false then
+		script.on_event(event_id, nil)
+	end
 end
 
 
@@ -258,11 +331,14 @@ function reset_scripts()
 	rcon_script_data = mod_data.rcon_script_data
 	mod_data.custom_commands_data = {}
 	custom_commands_data = mod_data.custom_commands_data
+	mod_data.custom_events_data = {}
+	custom_events_data = mod_data.custom_events_data
 	ompiled_admin_code = {}
 	compiled_public_code = {}
 	compiled_admin_area_code = {}
 	compiled_rcon_code = {}
 	compiled_commands_code = {}
+	compiled_custom_events_data = {}
 	add_admin_script(
 		{"scripts-titles.reveal-gen-map"},
 		{"scripts-description.reveal-gen-map"},
@@ -609,6 +685,45 @@ function add_rcon_script(name, description, code, compiler_id, version)
 end
 
 
+---@param event_name string
+---@param name string
+---@param description? string
+---@param code string
+---@param compiler_id integer
+---@param version string?
+---@return boolean is_valid
+function add_custom_event_script(event_name, name, description, code, compiler_id, version)
+	local event_id = defines.events[event_name]
+	if event_id == nil then
+		return false
+	end
+
+	code = format_code(code)
+	local f
+	if compiler_id == COMPILER_IDS.lua then
+		f = load(code)
+	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+		f = load(candran.make(code))
+	elseif compiler_id == COMPILER_IDS.teal_v0_14_1 then
+		f = tl.load(code)
+	elseif compiler_id == COMPILER_IDS.moonscript then
+		f = moonscript.loadstring(code)
+	end
+	if type(f) ~= "function" then return false end
+
+	compiled_custom_events_data[event_id] = compiled_custom_events_data[event_id] or {}
+	compiled_custom_events_data[event_id][name] = f
+	custom_events_data[event_name] = custom_events_data[event_name] or {}
+	custom_events_data[event_name][name] = {
+		description = description,
+		code = code,
+		compiler_id = compiler_id or COMPILER_IDS.lua,
+		version = version or script.active_mods.useful_book
+	}
+	add_custom_event(event_id)
+	return true
+end
+
 ---@param name string
 ---@param description? string
 ---@param code string
@@ -645,9 +760,7 @@ function add_new_command(name, description, code, compiler_id, version)
 	end
 end
 
-local function destroy_GUI_event(event)
-	local player_index = event.player_index
-	local player = game.get_player(player_index)
+local function destroy_GUI(player)
 	if not (player and player.valid) then return end
 
 	close_admin_area_scripts_frame(player)
@@ -667,7 +780,8 @@ end
 ---@param player table #LuaPlayer
 ---@param book_type integer
 ---@param id? integer|string
-function switch_code_editor(player, book_type, id)
+---@param event_name? string
+function switch_code_editor(player, book_type, id, event_name)
 	local screen = player.gui.screen
 	if screen.UB_code_editor then
 		screen.UB_code_editor.destroy()
@@ -682,6 +796,12 @@ function switch_code_editor(player, book_type, id)
 			data = admin_script_data[id]
 		elseif book_type == BOOK_TYPES.admin_area then
 			data = admin_area_script_data[id]
+		elseif book_type == BOOK_TYPES.custom_event then
+			-- Perhaps, I should change it
+			if custom_events_data[event_name] == nil then
+				return
+			end
+			data = custom_events_data[event_name][id]
 		elseif book_type == BOOK_TYPES.command then
 			data = custom_commands_data[id]
 			if data.is_added then
@@ -695,10 +815,16 @@ function switch_code_editor(player, book_type, id)
 
 	local main_frame = screen.add{type = "frame", name = "UB_code_editor", direction = "vertical"}
 	local footer = main_frame.add(FLOW)
+	local caption
+	if event_name then
+		caption = {'', {"useful_book.code_editor"}, ' (', BOOK_TITLES[book_type], ', ', event_name,')'}
+	else
+		caption = {'', {"useful_book.code_editor"}, ' (', BOOK_TITLES[book_type], ')'}
+	end
 	footer.add{
 		type = "label",
 		style = "frame_title",
-		caption = {"useful_book.code_editor"},
+		caption = caption,
 		ignored_by_interaction = true
 	}
 	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
@@ -718,7 +844,7 @@ function switch_code_editor(player, book_type, id)
 	content.sprite = "plus_white"
 	flow.add(content).visible = false
 
-	if book_type ~= BOOK_TYPES.rcon and book_type ~= BOOK_TYPES.admin_area and book_type ~= BOOK_TYPES.command then
+	if book_type == BOOK_TYPES.admin or book_type == BOOK_TYPES.public then
 		flow.add(LABEL).caption = {'', {"useful_book.is_public_script"}, COLON}
 	end
 	local UB_is_public_script = flow.add{type = "checkbox", name = "UB_is_public_script", state = (book_type == BOOK_TYPES.public), enabled = id and false}
@@ -733,12 +859,13 @@ function switch_code_editor(player, book_type, id)
 		selected_index = data and data.compiler_id or COMPILER_IDS.lua
 	}
 
-	if book_type == BOOK_TYPES.rcon or book_type == BOOK_TYPES.admin_area or book_type == BOOK_TYPES.command then
+	if book_type ~= BOOK_TYPES.admin and book_type ~= BOOK_TYPES.public then
 		UB_is_public_script.visible = false
 	end
-	flow.add{type = "checkbox", name = "UB_is_rcon_script", state = (book_type == BOOK_TYPES.rcon), visible = false}
-	flow.add{type = "checkbox", name = "UB_is_admin_area_script", state = (book_type == BOOK_TYPES.admin_area), visible = false}
-	flow.add{type = "checkbox", name = "UB_is_command", state = (book_type == BOOK_TYPES.command), visible = false}
+	flow.add{type = "slider", name = "UB_book_type", value = book_type, visible = false}
+	if book_type == BOOK_TYPES.custom_event then
+		flow.add{type = "textfield", name = "UB_event_name", text = event_name, visible = false}
+	end
 	if id then
 		local label_id = flow.add{type = "label", name = "id", visible = false}
 		if SCRIPTS_BY_ID[book_type] then
@@ -792,6 +919,8 @@ function switch_code_editor(player, book_type, id)
 		input.text = data and data.code or DEFAULT_RCON_TEXT
 	elseif book_type == BOOK_TYPES.admin_area then
 		input.text = data and data.code or DEFAULT_ADMIN_AREA_TEXT
+	elseif book_type == BOOK_TYPES.custom_event then
+		input.text = data and data.code or DEFAULT_CUSTOM_EVENT_TEXT
 	elseif book_type == BOOK_TYPES.command then
 		input.text = data and data.code or DEFAULT_COMMAND_TEXT
 	else
@@ -873,6 +1002,36 @@ local function fill_with_admin_data(table_element)
 		flow = table_element.add(FLOW)
 		flow.name = tostring(id)
 		flow.add(RUN_BUTTON)
+		flow.add(CHANGE_BUTTON)
+		flow.add(DELETE_BUTTON)
+	end
+end
+
+local function fill_with_custom_event_data(table_element, event_name)
+	if custom_events_data[event_name] == nil then return end
+	local DELETE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_delete_custom_event_code",
+		style = "frame_action_button",
+		sprite = "utility/trash_white",
+		hovered_sprite = "utility/trash",
+		clicked_sprite = "utility/trash"
+	}
+	local CHANGE_BUTTON = {
+		type = "sprite-button",
+		name = "UB_change_custom_event_code",
+		style = "frame_action_button",
+		sprite = "map_exchange_string_white",
+		hovered_sprite = "utility/map_exchange_string",
+		clicked_sprite = "utility/map_exchange_string"
+	}
+	local label, flow
+	for name, data in pairs(custom_events_data[event_name]) do
+		label = table_element.add(LABEL)
+		label.tooltip = data.description or ''
+		label.caption = name
+		flow = table_element.add(FLOW)
+		flow.name = name
 		flow.add(CHANGE_BUTTON)
 		flow.add(DELETE_BUTTON)
 	end
@@ -968,7 +1127,7 @@ end
 
 ---@param player table #LuaPlayer
 ---@param book_type integer
-function switch_book(player, book_type)
+function switch_book(player, book_type, selected_index)
 	local screen = player.gui.screen
 	if screen.UB_book_frame then
 		screen.UB_book_frame.destroy()
@@ -1007,10 +1166,9 @@ function switch_book(player, book_type)
 	end
 	footer.add(CLOSE_BUTTON)
 
-	local content_table = main_frame.add{type = "table", name = "content_table", column_count = 3}
+	local content_table = main_frame.add{type = "table", name = "content_table", column_count = 1}
 	content_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
 
-	content_table.add(LABEL).caption = BOOK_TITLES[book_type]
 	if player.admin then
 		local sub_flow = content_table.add(FLOW)
 		sub_flow.name = "nav_flow"
@@ -1028,6 +1186,16 @@ function switch_book(player, book_type)
 			hovered_sprite = "utility/reset",
 			clicked_sprite = "utility/reset"
 		}
+		if book_type == BOOK_TYPES.custom_event then
+			local sub_flow2 = content_table.add(FLOW)
+			sub_flow2.name = "event_names_flow"
+			sub_flow2.style.horizontally_stretchable = true
+			sub_flow2.add{
+				type = "drop-down", name = "UB_event_names",
+				items = EVENTS_NAMES,
+				selected_index = selected_index or 1
+			}
+		end
 	else
 		content_table.add(EMPTY_WIDGET).style.horizontally_stretchable = true
 	end
@@ -1040,6 +1208,9 @@ function switch_book(player, book_type)
 		fill_with_admin_data(scripts_table)
 	elseif book_type == BOOK_TYPES.admin_area then
 		fill_with_admin_area_data(scripts_table)
+	elseif book_type == BOOK_TYPES.custom_event then
+		local event_name = EVENTS_NAMES[selected_index or 1]
+		fill_with_custom_event_data(scripts_table, event_name)
 	elseif book_type == BOOK_TYPES.command then
 		fill_with_custom_commands_data(scripts_table)
 	else -- rcon
@@ -1073,11 +1244,14 @@ local function on_player_created(event)
 	local player = game.get_player(event.player_index)
 	if not (player and player.valid) then return end
 	create_left_relative_gui(player)
+	execute_custom_event(event, player)
 end
 
 local function on_gui_text_changed(event)
 	local element = event.element
 	if not (element and element.valid) then return end
+	local player = game.get_player(event.player_index)
+	execute_custom_event(event, player)
 	if element.name ~= "UB_program_input" then return end
 
 	--TODO: refactor
@@ -1147,38 +1321,62 @@ local GUIS = {
 		end
 	end,
 	UB_delete_public_code = function(element, player)
-		local id = tonumber(element.parent.name)
+		local flow = element.parent
+		local id = tonumber(flow.name)
 		---@cast id number
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
 		public_script_data[id] = nil
 		compiled_public_code[id] = nil
-		local flow = element.parent
-		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
-		flow.destroy()
 	end,
 	UB_delete_admin_code = function(element, player)
-		local id = tonumber(element.parent.name)
+		local flow = element.parent
+		local id = tonumber(flow.name)
 		---@cast id number
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
 		admin_script_data[id] = nil
 		compiled_admin_code[id] = nil
-		local flow = element.parent
-		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
-		flow.destroy()
 	end,
 	UB_delete_admin_area_code = function(element, player)
-		local name = element.parent.name
+		local flow = element.parent
+		local name = flow.name
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
 		admin_area_script_data[name] = nil
 		compiled_admin_area_code[name] = nil
-		local flow = element.parent
-		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
-		flow.destroy()
 	end,
 	UB_delete_rcon_code = function(element, player)
-		local name = element.parent.name
-		rcon_script_data[name] = nil
-		compiled_rcon_code[name] = nil
 		local flow = element.parent
+		local name = flow.name
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
+		rcon_script_data[name] = nil
+		compiled_rcon_code[name] = nil
+	end,
+	UB_delete_custom_event_code = function(element, player)
+		local flow = element.parent
+		local name = flow.name
+		custom_events_data[name] = nil
+		compiled_custom_events_data[name] = nil
+
+		local main_frame = flow.parent.parent.parent
+		local UB_event_names = main_frame.content_table.event_names_flow.UB_event_names
+		local event_name = UB_event_names.items[UB_event_names.selected_index]
+		local events_data = custom_events_data[event_name]
+		if events_data then
+			events_data[name] = nil
+		end
+		local event_id = defines.events[event_name]
+		if event_id then
+			local compiled_events = compiled_custom_events_data[event_id]
+			if compiled_events then
+				compiled_events[name] = nil
+			end
+		end
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
+		delete_custom_event(event_id, name)
 	end,
 	UB_delete_custom_command = function(element, player)
 		local name = element.parent.name
@@ -1211,11 +1409,25 @@ local GUIS = {
 	UB_change_command_code = function(element, player)
 		switch_code_editor(player, BOOK_TYPES.command, element.parent.name)
 	end,
+	UB_change_custom_event_code = function(element, player)
+		local flow = element.parent
+		local name = flow.name
+		local main_frame = flow.parent.parent.parent
+		local UB_event_names = main_frame.content_table.event_names_flow.UB_event_names
+		local event_name = UB_event_names.items[UB_event_names.selected_index]
+		switch_code_editor(player, BOOK_TYPES.custom_event, name, event_name)
+	end,
 	UB_open_code_editor = function(element, player)
 		local UB_book_frame = element.parent.parent
-		local book_type = UB_book_frame.content_table.nav_flow.UB_book_type.selected_index
+		local content_table = UB_book_frame.content_table
+		local book_type = content_table.nav_flow.UB_book_type.selected_index
+		local event_name
+		if book_type == BOOK_TYPES.custom_event then
+			local UB_event_names = content_table.event_names_flow.UB_event_names
+			event_name = UB_event_names.items[UB_event_names.selected_index]
+		end
 		UB_book_frame.destroy()
-		switch_code_editor(player, book_type)
+		switch_code_editor(player, book_type, nil, event_name)
 	end,
 	UB_add_code = function(element, player)
 		local title, description, code
@@ -1253,25 +1465,11 @@ local GUIS = {
 				end
 			end
 		end
-		local UB_is_public_script = flow.UB_is_public_script
-		local UB_is_rcon_script = flow.UB_is_rcon_script
-		local UB_is_admin_area_script = flow.UB_is_admin_area_script
-		local UB_is_command = flow.UB_is_command
+		local UB_book_type = flow.UB_book_type.slider_value
 		local compiler_id = flow.UB_compiler_id.selected_index
 		---@cast compiler_id integer
-		local book_type
-		if UB_is_public_script.state then
-			book_type = BOOK_TYPES.public
-		elseif UB_is_admin_area_script.state then
-			book_type = BOOK_TYPES.admin_area
-		elseif UB_is_rcon_script.state then
-			book_type = BOOK_TYPES.rcon
-		elseif UB_is_command.state then
-			book_type = BOOK_TYPES.command
-		else
-			book_type = BOOK_TYPES.admin
-		end
-		local is_enabled = UB_is_public_script.enabled
+		local book_type = UB_book_type
+		local is_enabled = flow.UB_is_public_script.enabled
 		if not is_enabled then
 			-- TODO: RECHECK
 			if book_type == BOOK_TYPES.admin then
@@ -1285,6 +1483,10 @@ local GUIS = {
 			elseif book_type == BOOK_TYPES.admin_area then
 				local name = flow.id.caption
 				add_admin_area_script(name, description, code, compiler_id)
+			elseif book_type == BOOK_TYPES.custom_event then
+				local event_name = flow.UB_event_name.text
+				local name = flow.id.caption
+				add_custom_event_script(event_name, name, description, code, compiler_id)
 			elseif book_type == BOOK_TYPES.command then
 				local name = flow.id.caption
 				local is_valid, is_command_added = add_new_command(name, description, code, compiler_id)
@@ -1302,6 +1504,9 @@ local GUIS = {
 				add_public_script(title, description, code, compiler_id)
 			elseif book_type == BOOK_TYPES.admin_area then
 				add_admin_area_script(title, description, code, compiler_id)
+			elseif book_type == BOOK_TYPES.custom_event then
+				local event_name = flow.UB_event_name.text
+				add_custom_event_script(event_name, title, description, code, compiler_id)
 			elseif book_type == BOOK_TYPES.command then
 				local is_valid, is_command_added = add_new_command(title, description, code, compiler_id)
 				if is_valid and not is_command_added then
@@ -1316,7 +1521,8 @@ local GUIS = {
 	end,
 	UB_run_code = function(element, player)
 		local parent = element.parent
-		local is_command = parent.UB_is_command.state
+		local UB_book_type = parent.UB_book_type.slider_value
+		local is_command = (UB_book_type == BOOK_TYPES.command)
 		local scroll_pane = parent.parent.scroll_pane
 		local code = scroll_pane.UB_program_input.text
 		local compiler_id = parent.UB_compiler_id.selected_index
@@ -1433,7 +1639,8 @@ local GUIS = {
 
 		local f = load(code)
 		if type(f) == "function" then
-			if flow.UB_is_rcon_script.state == false then
+			local UB_book_type = flow.UB_book_type.slider_value
+			if UB_book_type ~= BOOK_TYPES.rcon and UB_book_type ~= BOOK_TYPES.custom_event then
 				element.name = "UB_run_code"
 				element.sprite = "lua_snippet_tool_icon_white"
 				element.hovered_sprite = "utility/lua_snippet_tool_icon"
@@ -1472,10 +1679,12 @@ local GUIS = {
 local function on_gui_click(event)
 	local element = event.element
 	if not (element and element.valid) then return end
+	local player = game.get_player(event.player_index)
+	execute_custom_event(event, player)
 
 	local f = GUIS[element.name]
 	if f then
-		f(element, game.get_player(event.player_index), event)
+		f(element, player, event)
 	end
 end
 
@@ -1502,6 +1711,7 @@ local function on_player_selected_area(event)
 	if not is_ok then
 		player.print(error, RED_COLOR)
 	end
+	execute_custom_event(event, player)
 end
 
 local function on_player_cursor_stack_changed(event)
@@ -1517,6 +1727,7 @@ local function on_player_cursor_stack_changed(event)
 		return
 	end
 	close_admin_area_scripts_frame(player)
+	execute_custom_event(event, player)
 end
 
 --#endregion
@@ -1565,6 +1776,27 @@ local function compile_all_text()
 			end
 		end
 	end
+	for event_name, events_data in pairs(custom_events_data or {}) do
+		local event_id = defines.events[event_name]
+		if event_id then
+			compiled_custom_events_data[event_id] = compiled_custom_events_data[event_id] or {}
+			local compiled_N_custom_events = compiled_custom_events_data[event_id]
+			for name, data in pairs(events_data) do
+				local code = data.code
+				if data.compiler_id == COMPILER_IDS.lua then
+					compiled_N_custom_events[name] = load(code)
+				elseif data.compiler_id == COMPILER_IDS.candran_v1_0_0 then
+					code = candran.make(code)
+					compiled_N_custom_events[name] = load(code)
+				elseif data.compiler_id == COMPILER_IDS.teal_v0_14_1 then
+					compiled_N_custom_events[name] = tl.load(code)
+				elseif data.compiler_id == COMPILER_IDS.moonscript then
+					compiled_N_custom_events[name] = moonscript.loadstring(code)
+				end
+			end
+			add_custom_event(event_id)
+		end
+	end
 end
 
 local function link_data()
@@ -1575,6 +1807,7 @@ local function link_data()
 	rcon_script_data = mod_data.rcon_script_data
 	custom_commands_data = mod_data.custom_commands_data
 	players_admin_area_script = mod_data.players_admin_area_script
+	custom_events_data = mod_data.custom_events_data
 end
 
 local function update_global_data()
@@ -1585,6 +1818,7 @@ local function update_global_data()
 	mod_data.admin_area_script_data = mod_data.admin_area_script_data or {}
 	mod_data.rcon_script_data = mod_data.rcon_script_data or {}
 	mod_data.custom_commands_data = mod_data.custom_commands_data or {}
+	mod_data.custom_events_data = mod_data.custom_events_data or {}
 	mod_data.players_admin_area_script = {}
 	mod_data.last_public_id = mod_data.last_public_id or 0
 	mod_data.last_admin_id = mod_data.last_admin_id or 0
@@ -1620,6 +1854,13 @@ M.on_configuration_changed = function(event)
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
+
+	if version < 0.20 then
+		for _, player in pairs(game.players) do
+			-- it's in order to avoid potential bugs
+			destroy_GUI(player)
+		end
+	end
 	if version < 0.19 then
 		local function adapt_scripts(scripts)
 			for _, data in pairs(scripts) do
@@ -1797,6 +2038,16 @@ M.add_remote_interface = function()
 			rcon_script_data[name] = nil
 			compiled_rcon_code[name] = nil
 		end,
+		delete_custom_event_script = function(event_name, name)
+			local events_data = custom_events_data[event_name]
+			if events_data == nil then return end
+			events_data[name] = nil
+			local event_id = defines.events[event_name]
+			if event_id == nil then return end
+			local compiled_events = compiled_custom_events_data[event_id]
+			if compiled_events == nil then return end
+			compiled_events[name] = nil
+		end,
 		delete_command = function(name)
 			if custom_commands_data[name] == nil then return end
 			if compiled_commands_code[name] then
@@ -1808,6 +2059,7 @@ M.add_remote_interface = function()
 		add_public_script = add_public_script,
 		add_admin_area_script = add_admin_area_script,
 		add_rcon_script = add_rcon_script,
+		add_custom_event_script = add_custom_event_script,
 		add_new_command = add_new_command,
 		run_admin_script = function(id, player)
 			local f = compiled_public_code[id]
@@ -1837,6 +2089,11 @@ local DROP_DOWN_GUIS_FUNCS = {
 		element.parent.parent.parent.destroy()
 		switch_book(player, book_type)
 	end,
+	UB_event_names = function(element, player)
+		local selected_index = element.selected_index
+		element.parent.parent.parent.destroy()
+		switch_book(player, BOOK_TYPES.custom_event, selected_index)
+	end,
 	UB_admin_area_scripts_drop_down = function(element, player)
 		local selected_index = element.selected_index
 		players_admin_area_script[player.index] = element.items[selected_index]
@@ -1858,18 +2115,36 @@ M.events = {
 	[defines.events.on_gui_click] = on_gui_click,
 	[defines.events.on_gui_text_changed] = on_gui_text_changed,
 	[defines.events.on_player_created] = on_player_created,
-	[defines.events.on_player_joined_game] = destroy_GUI_event,
-	[defines.events.on_player_left_game] = destroy_GUI_event,
-	[defines.events.on_player_demoted] = destroy_GUI_event,
+	[defines.events.on_player_joined_game] = function(event)
+		local player = game.get_player(event.player_index)
+		destroy_GUI(player)
+		execute_custom_event(event, player)
+	end,
+	[defines.events.on_player_left_game] = function(event)
+		local player = game.get_player(event.player_index)
+		destroy_GUI(player)
+		execute_custom_event(event, player)
+	end,
+	[defines.events.on_player_demoted] = function(event)
+		local player = game.get_player(event.player_index)
+		destroy_GUI(player)
+		execute_custom_event(event, player)
+	end,
 	[defines.events.on_player_selected_area] = on_player_selected_area,
 	[defines.events.on_player_cursor_stack_changed] = on_player_cursor_stack_changed,
+	[defines.events.on_runtime_mod_setting_changed] = function(event)
+		local player = game.get_player(event.player_index)
+		execute_custom_event(event, player)
+	end,
 	[defines.events.on_gui_selection_state_changed] = function(event)
 		local element = event.element
 		if not (element and element.valid) then return end
 		local f = DROP_DOWN_GUIS_FUNCS[element.name]
+		local player = game.get_player(event.player_index)
 		if f then
-			f(element, game.get_player(event.player_index))
+			f(element, player)
 		end
+		execute_custom_event(event, player)
 	end
 }
 
@@ -1880,7 +2155,8 @@ M.commands = {
 			admin = {},
 			admin_area = admin_area_script_data,
 			rcon = rcon_script_data,
-			commands = custom_commands_data
+			commands = custom_commands_data,
+			custom_events = custom_events_data
 		}
 
 		local public_data = raw_data.public
