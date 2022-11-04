@@ -2133,7 +2133,11 @@ M.events = {
 	[defines.events.on_player_selected_area] = on_player_selected_area,
 	[defines.events.on_player_cursor_stack_changed] = on_player_cursor_stack_changed,
 	[defines.events.on_runtime_mod_setting_changed] = function(event)
-		local player = game.get_player(event.player_index)
+		local player
+		local player_index = event.player_index
+		if player_index then
+			player = game.get_player(player_index)
+		end
 		execute_custom_event(event, player)
 	end,
 	[defines.events.on_gui_selection_state_changed] = function(event)
