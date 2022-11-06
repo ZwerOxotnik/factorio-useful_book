@@ -235,6 +235,7 @@ local function add_custom_event(event_id)
 			end
 		end
 	end)
+	log("Added new event, id = " .. tostring(event_id))
 end
 
 
@@ -265,6 +266,7 @@ local function delete_custom_event(event_id, name)
 	end
 	if is_default_event == false then
 		script.on_event(event_id, nil)
+		log("Removed an event, id = " .. tostring(event_id))
 	end
 end
 
@@ -753,6 +755,7 @@ function add_new_command(name, description, code, compiler_id, version)
 		local f = format_command_code(code, compiler_id)
 		compiled_commands_code[name] = f
 		commands.add_command(name, description or '', f)
+		log("Added new command : " .. name)
 		return true, true
 	else
 		custom_commands_data[name].is_added = false
@@ -806,6 +809,7 @@ function switch_code_editor(player, book_type, id, event_name)
 			data = custom_commands_data[id]
 			if data.is_added then
 				commands.remove_command(id)
+				log("Remove a command with name: " .. name)
 				data.is_added = false
 			end
 		else -- rcon
@@ -1384,6 +1388,7 @@ local GUIS = {
 		if data then
 			if data.is_added then
 				commands.remove_command(name)
+				log("Remove a command with name: " .. name)
 			end
 			custom_commands_data[name] = nil
 			if compiled_commands_code[name] then -- there's something weird about Factorio lua, so I shouldn't nil twice
@@ -1762,15 +1767,17 @@ local function compile_all_text()
 	compile_script_data(rcon_script_data, compiled_rcon_code)
 	for name, data in pairs(custom_commands_data or {}) do
 		if data.is_added then
-			if game and not (commands.commands[name] or commands.game_commands[name]) then
+			if game and not commands.commands[name] and not commands.game_commands[name] then
 				data.is_added = true
 				local f = format_command_code(data.code, data.compiler_id)
 				compiled_commands_code[name] = f
 				commands.add_command(name, data.description or '', f) -- Perhaps, I should do something about other cases
+				log("Added new command : " .. name)
 			elseif game == nil then
 				local f = format_command_code(data.code, data.compiler_id)
 				compiled_commands_code[name] = f
 				commands.add_command(name, data.description or '', f) -- Perhaps, I should do something about other cases
+				log("Added new command : " .. name)
 			else
 				data.is_added = false
 			end
