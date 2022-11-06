@@ -333,7 +333,7 @@ function reset_scripts()
 	custom_commands_data = mod_data.custom_commands_data
 	mod_data.custom_events_data = {}
 	custom_events_data = mod_data.custom_events_data
-	ompiled_admin_code = {}
+	compiled_admin_code = {}
 	compiled_public_code = {}
 	compiled_admin_area_code = {}
 	compiled_rcon_code = {}
