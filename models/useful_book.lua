@@ -1843,7 +1843,9 @@ local function update_global_data()
 	compile_all_text()
 end
 
+local is_on_init = false
 M.on_init = function()
+	is_on_init = true
 	update_global_data()
 	local UB_json_data = settings.global.UB_json_data.value
 	if UB_json_data == '' then
@@ -1854,10 +1856,11 @@ M.on_init = function()
 end
 
 M.on_configuration_changed = function(event)
-	update_global_data()
-
 	local mod_changes = event.mod_changes["useful_book"]
 	if not (mod_changes and mod_changes.old_version) then return end
+	if is_on_init == false then
+		update_global_data()
+	end
 
 	local version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
