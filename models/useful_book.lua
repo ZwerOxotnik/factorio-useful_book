@@ -10,7 +10,7 @@ Version = require("__zk-lib__/static-libs/lualibs/version")
 
 --#region Compilers
 candran = require("__zk-lib__/lualib/candran/candran")
-tl = require("__zk-lib__/lualib/tl/0.14.1/tl")
+tl = require("__zk-lib__/lualib/tl/0.15.1/tl")
 -- Perhaps, I've missed something in moonscript
 moonscript = require("__zk-lib__/lualib/moonscript/base")
 --#endregion
@@ -110,9 +110,9 @@ local COMPILER_IDS = {
 }
 local COMPILER_NAMES = {
 	[COMPILER_IDS.lua] = "lua",
-	[COMPILER_IDS.candran_v1_0_0] = "candran v1.0.0",
-	[COMPILER_IDS.teal_v0_14_1] = "teal v0.14.1",
-	[COMPILER_IDS.moonscript] = "moonscript dev"
+	[COMPILER_IDS.candran_v1_0_0] = "candran v" .. candran.VERSION,
+	[COMPILER_IDS.teal_v0_14_1] = "teal v" .. tl.VERSION,
+	[COMPILER_IDS.moonscript] = "moonscript v" .. moonscript.VERSION
 }
 local EVENTS_NAMES = {}
 for name in pairs(defines.events) do
