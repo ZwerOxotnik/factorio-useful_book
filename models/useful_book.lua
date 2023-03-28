@@ -809,7 +809,7 @@ function switch_code_editor(player, book_type, id, event_name)
 			data = custom_commands_data[id]
 			if data.is_added then
 				commands.remove_command(id)
-				log("Remove a command with name: " .. name)
+				log("Remove a command with name: " .. id)
 				data.is_added = false
 			end
 		else -- rcon

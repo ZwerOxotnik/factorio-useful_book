@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.20.7
+Date: 28. 03. 2023
+  Locale:
+    - Probably, fixed a crush when a command was changed
+  Locale:
+    - Updated Russian translation (thanks to @oZeDo on crowdin)
+---------------------------------------------------------------------------------------------------
 Version: 0.20.6
 Date: 12. 02. 2023
   Locale:
