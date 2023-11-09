@@ -57,11 +57,6 @@ This mod is designed to be safe, simple and fast.
   <a href="https://mods.factorio.com/mod/useful_book/downloads"><strong>Download the mod&nbsp;&nbsp;▶</strong></a>
 </p>
 
-**3rd party libraries**:
-- [fun](/lualib/fun.lua) - a functional programming library ([documentation](https://luafun.github.io/), [source](https://github.com/luafun/luafun/blob/master/fun.lua))\
-You can use it in scripts via "fun" variable.
-- [gvv](https://mods.factorio.com/mod/gvv) - a debugging tool as Factorio mod (optional)
-
 ‼️ Important Links (Translations, Discord Support)
 ---------------------------------------------------------------
 

@@ -1,12 +1,13 @@
 {
   "name": "useful_book",
-  "version": "0.20.7",
+  "version": "0.20.8",
   "factorio_version": "1.1",
   "title": "Useful book",
   "author": "ZwerOxotnik",
-  "contact": "zweroxotnik@gmail.com, Discord:ZwerOxotnik#7117",
+  "contact": "zweroxotnik@gmail.com, Discord:ZwerOxotnik",
   "dependencies": [
-		"zk-lib >= 0.12.0",
+		"zk-lib >= 0.16.0",
+		"BetterCommands",
 		"? gvv",
     "? AARR"
 	]
