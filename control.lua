@@ -7,8 +7,15 @@ modules.useful_book  = require("models/useful_book")
 modules.GuiTemplater = require(zk_modules.static_libs.control_stage.GuiTemplater)
 
 if remote.interfaces["disable-useful_book"] then
-	local module = modules["useful_book"]
-	modules.useful_book.events = nil
+	local module = modules.useful_book
+	module.events = nil
+	module.on_nth_tick = nil
+	module.commands = nil
+	module.on_load = nil
+	module.add_remote_interface = nil
+	module.add_commands = nil
+	local module = modules.GuiTemplater
+	module.events = nil
 	module.on_nth_tick = nil
 	module.commands = nil
 	module.on_load = nil

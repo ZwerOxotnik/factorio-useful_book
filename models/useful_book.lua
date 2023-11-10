@@ -2,11 +2,13 @@
 local M = {}
 
 local zk_modules = require("__zk-lib__/defines").modules
+
 --#region Compilers
 moonscript = require(zk_modules.moonscript)
 candran    = require(zk_modules.candran)
 tl         = require(zk_modules.tl)
 --#endregion
+
 bitwise    = require(zk_modules.bitwise)
 luxtre     = require(zk_modules.luxtre)
 basexx     = require(zk_modules.basexx)
@@ -17,6 +19,12 @@ lpeg       = require(zk_modules.lpeg)
 LCS        = require(zk_modules.LCS)
 lal        = require(zk_modules.lal)
 fun        = require(zk_modules.fun)
+all_control_utils = require(zk_modules.static_libs.all_control_utils)
+Locale  = require(zk_modules.static_libs.locale)
+Version = require(zk_modules.static_libs.version)
+time_util   = require(zk_modules.static_libs.time_util)
+number_util = require(zk_modules.static_libs.number_util)
+coordinates_util = require(zk_modules.static_libs.coordinates_util)
 GuiTemplater = require(zk_modules.static_libs.control_stage.GuiTemplater)
 
 
@@ -108,13 +116,13 @@ local SCRIPTS_BY_ID = { -- scripts which identified by id
 }
 local COMPILER_IDS = {
 	lua            = 1,
-	candran_v1_0_0 = 2,
+	candran        = 2,
 	teal           = 3,
 	moonscript     = 4,
 }
 local COMPILER_NAMES = {
 	[COMPILER_IDS.lua] = "lua",
-	[COMPILER_IDS.candran_v1_0_0] = "candran v" .. candran.VERSION,
+	[COMPILER_IDS.candran] = "candran v" .. candran.VERSION,
 	[COMPILER_IDS.teal] = "teal v" .. tl.VERSION,
 	[COMPILER_IDS.moonscript] = "moonscript v" .. moonscript.VERSION
 }
@@ -161,7 +169,7 @@ end
 local function fix_old_data(data)
 	if data.compiler_id then return end
 	if data.use_candran then
-		data.compiler_id = COMPILER_IDS.candran_v1_0_0
+		data.compiler_id = COMPILER_IDS.candran
 		data.use_candran = nil
 	elseif data.use_candran ~= nil then
 		data.compiler_id = COMPILER_IDS.lua
@@ -283,28 +291,11 @@ function open_import_frame(_, player)
 		return
 	end
 
-	local main_frame = screen.add{
-		type = "frame",
-		name = "UB_import_frame",
-		direction = "vertical"
-	}
-	main_frame.auto_center = true
+	local content_frame, main_frame, top_flow = GuiTemplater.create_screen_window(player, "UB_import_frame", {"gui-blueprint-library.import-string"})
+	content_frame.style.padding = 0
+	main_frame.force_auto_center()
 
-	local footer = main_frame.add(FLOW)
-	footer.add{
-		type = "label",
-		style = "frame_title",
-		caption = {"gui-blueprint-library.import-string"},
-		ignored_by_interaction = true
-	}
-	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
-	drag_handler.drag_target = main_frame
-	drag_handler.style.right_margin = 0
-	drag_handler.style.horizontally_stretchable = true
-	drag_handler.style.height = 32
-	footer.add(CLOSE_BUTTON)
-
-	local textfield = main_frame.add{
+	local textfield = content_frame.add{
 		type = "text-box",
 		name = "UB_text_for_import",
 		style = "UB_program_input"
@@ -527,12 +518,25 @@ DEFAULT_COMMAND_TEXT = format_code(DEFAULT_COMMAND_TEXT)
 ---@param compiler_id integer
 ---@return function
 function format_command_code(code, compiler_id)
-	if compiler_id == COMPILER_IDS.candran_v1_0_0 then
-		code = candran.make(code)
+	local is_ok
+	if compiler_id == COMPILER_IDS.candran then
+		is_ok, code = pcall(candran.make, code) -- TODO: perhaps, xpcall
+		if not is_ok then
+			log(code)
+			code = ""
+		end
 	elseif compiler_id == COMPILER_IDS.teal then
-		code = tl.gen(code)
+		is_ok, code = pcall(tl.gen, code) -- TODO: perhaps, xpcall
+		if not is_ok then
+			log(code)
+			code = ""
+		end
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		code = moonscript.to_lua(code)
+		is_ok, code = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
+		if not is_ok then
+			log(code)
+			code = ""
+		end
 	end
 	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
@@ -567,7 +571,7 @@ function add_admin_script(title, description, code, compiler_id, id, version)
 	local f
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
@@ -604,13 +608,14 @@ function add_public_script(title, description, code, compiler_id, id, version)
 	local f
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
 		f = moonscript.loadstring(code)
 	end
+
 	if type(f) ~= "function" then return end
 
 	if id == nil then
@@ -640,7 +645,7 @@ function add_admin_area_script(name, description, code, compiler_id, version)
 	local f
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
@@ -671,7 +676,7 @@ function add_rcon_script(name, description, code, compiler_id, version)
 	local f
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
@@ -708,13 +713,14 @@ function add_custom_event_script(event_name, name, description, code, compiler_i
 	local f
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
 		f = moonscript.loadstring(code)
 	end
+
 	if type(f) ~= "function" then return false end
 
 	compiled_custom_events_data[event_id] = compiled_custom_events_data[event_id] or {}
@@ -744,7 +750,7 @@ function add_new_command(name, description, code, compiler_id, version)
 		if type(moonscript.loadstring(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.teal then
 		if type(tl.load(code)) ~= "function" then return false, false end
-	elseif compiler_id == COMPILER_IDS.candran_v1_0_0 then
+	elseif compiler_id == COMPILER_IDS.candran then
 		if type(load(candran.make(code))) ~= "function" then return false, false end
 	end
 
@@ -790,10 +796,10 @@ end
 ---@param event_name? string
 function switch_code_editor(player, book_type, id, event_name)
 	local screen = player.gui.screen
-	if screen.UB_code_editor then
-		screen.UB_code_editor.destroy()
-		return
-	end
+	-- if screen.UB_code_editor then
+	-- 	screen.UB_code_editor.destroy()
+	-- 	return
+	-- end
 
 	local data
 	if id then
@@ -821,28 +827,29 @@ function switch_code_editor(player, book_type, id, event_name)
 		end
 	end
 
-	local main_frame = screen.add{type = "frame", name = "UB_code_editor", direction = "vertical"}
-	local footer = main_frame.add(FLOW)
 	local caption
 	if event_name then
 		caption = {'', {"useful_book.code_editor"}, ' (', BOOK_TITLES[book_type], ', ', event_name,')'}
 	else
 		caption = {'', {"useful_book.code_editor"}, ' (', BOOK_TITLES[book_type], ')'}
 	end
-	footer.add{
-		type = "label",
-		style = "frame_title",
-		caption = caption,
-		ignored_by_interaction = true
-	}
-	local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
-	drag_handler.drag_target = main_frame
-	drag_handler.style.right_margin = 0
-	drag_handler.style.horizontally_stretchable = true
-	drag_handler.style.height = 32
-	footer.add(CLOSE_BUTTON)
+	local content_frame, main_frame, top_flow = GuiTemplater.create_screen_window(player, "UB_code_editor", caption)
+	-- local main_frame = screen.add{type = "frame", name = "UB_code_editor", direction = "vertical"}
+	-- local footer = main_frame.add(FLOW)
+	-- footer.add{
+	-- 	type = "label",
+	-- 	style = "frame_title",
+	-- 	caption = caption,
+	-- 	ignored_by_interaction = true
+	-- }
+	-- local drag_handler = footer.add{type = "empty-widget", style = "draggable_space"}
+	-- drag_handler.drag_target = main_frame
+	-- drag_handler.style.right_margin = 0
+	-- drag_handler.style.horizontally_stretchable = true
+	-- drag_handler.style.height = 32
+	-- footer.add(CLOSE_BUTTON)
 
-	local flow = main_frame.add(FLOW)
+	local flow = content_frame.add(FLOW)
 	flow.name = "buttons_row"
 	local content = {type = "sprite-button"}
 	content.name = "UB_check_code"
@@ -883,9 +890,9 @@ function switch_code_editor(player, book_type, id, event_name)
 		end
 	end
 
-	main_frame.add({type = "label", name = "error_message", style = "bold_red_label", visible = false})
+	content_frame.add({type = "label", name = "error_message", style = "bold_red_label", visible = false})
 
-	local scroll_pane = main_frame.add{type = "scroll-pane", name = "scroll_pane"}
+	local scroll_pane = content_frame.add{type = "scroll-pane", name = "scroll_pane"}
 	flow = scroll_pane.add(FLOW)
 	flow.name = "UB_title"
 	local title_label = flow.add(LABEL)
@@ -934,6 +941,7 @@ function switch_code_editor(player, book_type, id, event_name)
 	else
 		input.text = data and data.code or DEFAULT_TEXT
 	end
+
 	main_frame.force_auto_center()
 end
 
@@ -1156,21 +1164,10 @@ function switch_book(player, book_type, selected_index)
 	drag_handler.style.horizontally_stretchable = true
 	drag_handler.style.height = 32
 	if player.admin then
-		footer.add{
-			type = "sprite-button",
-			name = "UB_open_import",
-			sprite = "utility/import", -- TODO: add white button
-			tooltip = {"gui-blueprint-library.import-string"},
-			style = "frame_action_button"
-		}
-		footer.add{
-			type = "sprite-button",
-			name = "UB_open_code_editor",
-			style = "frame_action_button",
-			sprite = "plus_white",
-			hovered_sprite = "plus",
-			clicked_sprite = "plus"
-		}
+		local import = footer.add(GuiTemplater.buttons.import)
+		import.name = "UB_open_import"
+		local plus = footer.add(GuiTemplater.buttons.plus)
+		plus.name = "UB_open_code_editor"
 	end
 	footer.add(CLOSE_BUTTON)
 
@@ -1537,7 +1534,7 @@ local GUIS = {
 		local compiler_id = parent.UB_compiler_id.selected_index
 		local is_ok, _error
 
-		if compiler_id == COMPILER_IDS.candran_v1_0_0 then
+		if compiler_id == COMPILER_IDS.candran then
 			local _is_ok, result = pcall(candran.make, code)
 			if _is_ok then
 				code = result
@@ -1561,7 +1558,12 @@ local GUIS = {
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.moonscript then
-			local lua_code, message = moonscript.to_lua(code)
+			local is_ok, lua_code, message = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
+			if not is_ok then
+				player.print(lua_code, RED_COLOR)
+				return
+			end
+
 			if lua_code then
 				code = lua_code
 			else
@@ -1608,7 +1610,7 @@ local GUIS = {
 		local main_frame = flow.parent
 		local code = main_frame.scroll_pane.UB_program_input.text
 		local compiler_id = flow.UB_compiler_id.selected_index
-		if compiler_id == COMPILER_IDS.candran_v1_0_0 then
+		if compiler_id == COMPILER_IDS.candran then
 			local is_ok, result = pcall(candran.make, code)
 			if is_ok then
 				code = result
@@ -1678,7 +1680,7 @@ local GUIS = {
 			return
 		end
 
-		if import_scripts(UB_import_frame.UB_text_for_import.text, player) then
+		if import_scripts(UB_import_frame.children[2].UB_text_for_import.text, player) then
 			UB_import_frame.destroy()
 		end
 	end,
@@ -1758,7 +1760,7 @@ local function compile_script_data(script_data, compiled_script_data)
 		local code = data.code
 		if data.compiler_id == COMPILER_IDS.lua then
 			compiled_script_data[id] = load(code)
-		elseif data.compiler_id == COMPILER_IDS.candran_v1_0_0 then
+		elseif data.compiler_id == COMPILER_IDS.candran then
 			code = candran.make(code)
 			compiled_script_data[id] = load(code)
 		elseif data.compiler_id == COMPILER_IDS.teal then
@@ -1801,7 +1803,7 @@ local function compile_all_text()
 				local code = data.code
 				if data.compiler_id == COMPILER_IDS.lua then
 					compiled_N_custom_events[name] = load(code)
-				elseif data.compiler_id == COMPILER_IDS.candran_v1_0_0 then
+				elseif data.compiler_id == COMPILER_IDS.candran then
 					code = candran.make(code)
 					compiled_N_custom_events[name] = load(code)
 				elseif data.compiler_id == COMPILER_IDS.teal then

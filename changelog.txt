@@ -1,10 +1,20 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.20.9
+Date: 09. 11. 2023
+  Changes:
+    - Updated libraries
+    - Updated and fixed Teal
+    - Improved some GUIs
+  Bugfixes:
+    - Returned missing lbraries from v0.20.7
+    - Other languages are safer now
+---------------------------------------------------------------------------------------------------
 Version: 0.20.8
 Date: 09. 11. 2023
   Changes:
     - Updated libraries
   Bugfixes:
-    - Moonscript slightly safer
+    - Moonscript is slightly safer
 ---------------------------------------------------------------------------------------------------
 Version: 0.20.7
 Date: 28. 03. 2023
