@@ -147,7 +147,7 @@ for name in pairs(defines.events) do
 end
 
 
-delete_admin_hotkey_template = GuiTemplater.create{
+local __delete_admin_hotkey_template = GuiTemplater.create{
 	element = {
 		type = "sprite-button",
 		name = "UB_delete_admin_hotkey_code",
@@ -158,17 +158,19 @@ delete_admin_hotkey_template = GuiTemplater.create{
 	},
 	on_gui_click = function(element, player, event)
 		local flow = element.parent
-		local name = flow.name
+		local script_name = flow.name
+
 		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
 		flow.destroy()
-		__admin_hotkey_script_data[name] = nil
-		__compiled_admin_hotkey_code[name] = nil
+
+		__admin_hotkey_script_data[script_name] = nil
+		__compiled_admin_hotkey_code[script_name] = nil
 
 		local bindings = __mod_data.admin_script_bindings[player.index]
 		if bindings then
 			for hotkey, script_names in pairs(bindings) do
 				for i=#script_names, 1, -1 do
-					if name == script_names[i] then
+					if script_name == script_names[i] then
 						table.remove(script_names, i)
 						if #script_names == 0 then
 							bindings[hotkey] = nil
@@ -177,13 +179,13 @@ delete_admin_hotkey_template = GuiTemplater.create{
 					end
 				end
 			end
-			if table_size(__mod_data.admin_script_bindings[player.index]) == 0 then
+			if table_size(bindings) == 0 then
 				__mod_data.admin_script_bindings[player.index] = nil
 			end
 		end
 	end
 }
-change_admin_hotkey_code_element = GuiTemplater.create{
+local __change_admin_hotkey_code_element = GuiTemplater.create{
 	element = {
 		type = "sprite-button",
 		name = "UB_change_admin_hotkey_code",
@@ -194,6 +196,58 @@ change_admin_hotkey_code_element = GuiTemplater.create{
 	},
 	on_gui_click = function(element, player, event)
 		switch_code_editor(player, BOOK_TYPES.admin_hotkey, element.parent.name)
+	end
+}
+local __delete_public_hotkey_template = GuiTemplater.create{
+	element = {
+		type = "sprite-button",
+		name = "UB_delete_public_hotkey_code",
+		style = "frame_action_button",
+		sprite = "utility/trash_white",
+		hovered_sprite = "utility/trash",
+		clicked_sprite = "utility/trash"
+	},
+	on_gui_click = function(element, player, event)
+		local flow = element.parent
+		local script_name = flow.name
+
+		flow.parent.children[flow.get_index_in_parent() - 1].destroy()
+		flow.destroy()
+
+		__public_hotkey_script_data[script_name] = nil
+		__compiled_public_hotkey_code[script_name] = nil
+		__mod_data.public_hotkey_scripts_ticks[script_name] = nil
+
+		local bindings = __mod_data.public_script_bindings[player.index]
+		if bindings then
+			for hotkey, script_names in pairs(bindings) do
+				for i=#script_names, 1, -1 do
+					if script_name == script_names[i] then
+						table.remove(script_names, i)
+						if #script_names == 0 then
+							bindings[hotkey] = nil
+						end
+						break
+					end
+				end
+			end
+			if table_size(bindings) == 0 then
+				__mod_data.public_script_bindings[player.index] = nil
+			end
+		end
+	end
+}
+local __change_public_hotkey_code_element = GuiTemplater.create{
+	element = {
+		type = "sprite-button",
+		name = "UB_change_public_hotkey_code",
+		style = "frame_action_button",
+		sprite = "map_exchange_string_white",
+		hovered_sprite = "utility/map_exchange_string",
+		clicked_sprite = "utility/map_exchange_string"
+	},
+	on_gui_click = function(element, player, event)
+		switch_code_editor(player, BOOK_TYPES.public_hotkey, element.parent.name)
 	end
 }
 --#endregion
@@ -247,7 +301,7 @@ end
 
 
 ---@param json string
----@param player? table #LuaPlayer
+---@param player? LuaPlayer
 ---@return boolean
 function import_scripts(json, player)
 	local target = player or game
@@ -356,7 +410,7 @@ end
 
 
 ---@param _ nil
----@param player table #LuaPlayer
+---@param player LuaPlayer
 function open_import_frame(_, player)
 	local screen = player.gui.screen
 	if screen.UB_import_frame then
@@ -390,10 +444,16 @@ function open_import_frame(_, player)
 end
 
 function reset_scripts()
+	__mod_data.public_hotkey_scripts_ticks = {}
+
 	__mod_data.admin_script_data = {}
 	__admin_script_data = __mod_data.admin_script_data
 	__mod_data.public_script_data = {}
 	__public_script_data = __mod_data.public_script_data
+	__mod_data.admin_hotkey_script_data = {}
+	__admin_hotkey_script_data = __mod_data.admin_hotkey_script_data
+	__mod_data.public_hotkey_script_data = {}
+	__public_hotkey_script_data = __mod_data.public_hotkey_script_data
 	__mod_data.admin_area_script_data = {}
 	__admin_area_script_data = __mod_data.admin_area_script_data
 	__mod_data.rcon_script_data = {}
@@ -410,6 +470,7 @@ function reset_scripts()
 	__compiled_custom_events_data = {}
 	__compiled_public_hotkey_code = {}
 	__compiled_admin_hotkey_code  = {}
+
 	add_admin_hotkey_script(
 		"unstuck", "Unstucks your character",
 		"local player, event = ...\n" ..
@@ -545,7 +606,7 @@ function reset_scripts()
 	end
 end
 
----@param player table #LuaPlayer
+---@param player LuaPlayer
 function close_admin_area_scripts_frame(player)
 	local frame = player.gui.screen.UB_admin_area_scripts_frame
 	if frame then
@@ -554,7 +615,7 @@ function close_admin_area_scripts_frame(player)
 	end
 end
 
----@param player table #LuaPlayer
+---@param player LuaPlayer
 function open_admin_area_scripts_frame(player)
 	local screen = player.gui.screen
 	if screen.UB_admin_area_scripts_frame then
@@ -940,7 +1001,7 @@ local function destroy_GUI(player)
 end
 
 
----@param player table #LuaPlayer
+---@param player LuaPlayer
 ---@param book_type integer
 ---@param id? integer|string
 ---@param event_name? string
@@ -1264,10 +1325,25 @@ local function fill_with_rcon_data(table_element)
 end
 
 local function fill_with_admin_hotkey_script_data(table_element)
-	local DELETE_BUTTON = delete_admin_hotkey_template.element
-	local CHANGE_BUTTON = change_admin_hotkey_code_element.element
+	local DELETE_BUTTON = __delete_admin_hotkey_template.element
+	local CHANGE_BUTTON = __change_admin_hotkey_code_element.element
 	local label, flow
 	for name, data in pairs(__admin_hotkey_script_data) do
+		label = table_element.add(LABEL)
+		label.tooltip = data.description or ''
+		label.caption = name
+		flow = table_element.add(FLOW)
+		flow.name = name
+		flow.add(CHANGE_BUTTON)
+		flow.add(DELETE_BUTTON)
+	end
+end
+
+local function fill_with_public_hotkey_script_data(table_element)
+	local DELETE_BUTTON = __delete_public_hotkey_template.element
+	local CHANGE_BUTTON = __change_public_hotkey_code_element.element
+	local label, flow
+	for name, data in pairs(__public_hotkey_script_data) do
 		label = table_element.add(LABEL)
 		label.tooltip = data.description or ''
 		label.caption = name
@@ -1308,7 +1384,7 @@ local function fill_with_custom_commands_data(table_element)
 end
 
 
----@param player table #LuaPlayer
+---@param player LuaPlayer
 ---@param book_type integer
 function switch_book(player, book_type, selected_index)
 	local screen = player.gui.screen
@@ -1387,6 +1463,8 @@ function switch_book(player, book_type, selected_index)
 		fill_with_custom_commands_data(scripts_table)
 	elseif book_type == BOOK_TYPES.admin_hotkey then
 		fill_with_admin_hotkey_script_data(scripts_table)
+	elseif book_type == BOOK_TYPES.public_hotkey then
+		fill_with_public_hotkey_script_data(scripts_table)
 	elseif book_type == BOOK_TYPES.rcon then
 		fill_with_rcon_data(scripts_table)
 	else
@@ -1416,6 +1494,7 @@ end
 
 --#region Events
 
+
 ---@param event EventData.on_player_created
 function M.on_player_created(event)
 	local player = game.get_player(event.player_index)
@@ -1423,6 +1502,20 @@ function M.on_player_created(event)
 	create_left_relative_gui(player)
 	execute_custom_event(event, player)
 end
+
+
+---@param event EventData.on_player_removed
+function M.on_player_removed(event)
+	local player_index = event.player_index
+
+	__players_admin_area_script[player_index] = nil
+	__mod_data.public_script_bindings[player_index] = nil
+	__mod_data.admin_script_bindings[player_index]  = nil
+	for _, data in pairs(__mod_data.public_hotkey_scripts_ticks) do
+		data[player_index] = nil
+	end
+end
+
 
 ---@param event EventData.on_gui_text_changed
 function M.on_gui_text_changed(event)
@@ -1443,6 +1536,7 @@ function M.on_gui_text_changed(event)
 		button.visible = false
 	end
 end
+
 
 local GUIS = {
 	UB_close = function(element)
@@ -1889,6 +1983,7 @@ function M.on_gui_click(event)
 	end
 end
 
+
 ---@param event EventData.on_player_selected_area
 function M.on_player_selected_area(event)
 	local entities = event.entities
@@ -1915,6 +2010,7 @@ function M.on_player_selected_area(event)
 	end
 	execute_custom_event(event, player)
 end
+
 
 ---@param event EventData.on_player_cursor_stack_changed
 function M.on_player_cursor_stack_changed(event)
@@ -2034,6 +2130,8 @@ local function update_global_data()
 	__mod_data.public_script_bindings = __mod_data.public_script_bindings or {}
 	---@type table<int, table<int, string[]>>
 	__mod_data.admin_script_bindings  = __mod_data.admin_script_bindings or {}
+	---@type table<string, table<integer, integer>>
+	__mod_data.public_hotkey_scripts_ticks = __mod_data.public_hotkey_scripts_ticks or {}
 	__mod_data.players_admin_area_script = {}
 	__mod_data.last_public_id = __mod_data.last_public_id or 0
 	__mod_data.last_admin_id  = __mod_data.last_admin_id  or 0
@@ -2342,6 +2440,7 @@ M.events = {
 	[defines.events.on_gui_click] = M.on_gui_click,
 	[defines.events.on_gui_text_changed] = M.on_gui_text_changed,
 	[defines.events.on_player_created] = M.on_player_created,
+	[defines.events.on_player_removed] = M.on_player_removed,
 	[defines.events.on_player_joined_game] = function(event)
 		local player = game.get_player(event.player_index)
 		destroy_GUI(player)
@@ -2353,9 +2452,13 @@ M.events = {
 		execute_custom_event(event, player)
 	end,
 	[defines.events.on_player_demoted] = function(event)
-		local player = game.get_player(event.player_index)
+		local player_index = event.player_index
+		local player = game.get_player(player_index)
+
 		destroy_GUI(player)
 		execute_custom_event(event, player)
+
+		__mod_data.admin_script_bindings[player_index] = nil
 	end,
 	[defines.events.on_player_selected_area] = M.on_player_selected_area,
 	[defines.events.on_player_cursor_stack_changed] = M.on_player_cursor_stack_changed,
@@ -2393,12 +2496,32 @@ if script.mod_name ~= "level" then
 		local _, _, hotkey = event.input_name:find("^UB_hotkey_(.+)")
 		hotkey = tonumber(hotkey)
 
+		local game_tick = event.tick
+		local hotkey_scripts_tick = __mod_data.public_hotkey_scripts_ticks
 		local script_hotkeys = __mod_data.public_script_bindings[player_index]
 		if script_hotkeys then
 			local script_names = script_hotkeys[hotkey]
 			if script_names then
 				for i=#script_names, 1, -1 do
 					local script_name = script_names[i]
+					local hotkey_script_ticks = hotkey_scripts_tick[script_name]
+					if hotkey_script_ticks == nil then
+						hotkey_scripts_tick[script_name] = {
+							[player_index] = game_tick
+						}
+					else
+						local tick = hotkey_script_ticks[player_index]
+						if tick == nil then
+							hotkey_script_ticks[player_index] = {
+								[player_index] = game_tick
+							}
+						elseif tick ~= game_tick then
+							hotkey_script_ticks[player_index] = game_tick
+						else
+							goto continue
+						end
+					end
+
 					local f = __compiled_public_hotkey_code[script_name]
 					if f then
 						local is_ok, error = pcall(f, player, event)
@@ -2408,6 +2531,7 @@ if script.mod_name ~= "level" then
 					else
 						table.remove(script_names, i)
 					end
+				    ::continue::
 				end
 			end
 		end
@@ -2505,7 +2629,7 @@ M.commands = {
 			return
 		end
 
-	-- TODO: add localization
+		-- TODO: add localization
 		local message = "Script has been binded to a hotkey"
 		local bindings = __mod_data.admin_script_bindings
 		bindings[player_index] = bindings[player_index] or {}
@@ -2530,7 +2654,67 @@ M.commands = {
 		end
 
 		player.print(message, GREEN_COLOR)
-	end
+	end,
+	["bind-public-script"] = function(cmd)
+		---@type int
+		local player_index = cmd.player_index
+		local player = game.get_player(player_index)
+		---@cast player LuaPlayer
+		local parameter = cmd.parameter or ""
+
+		local start_i, _, hotkey = parameter:find("(%d+)%s*$")
+		if hotkey then
+			hotkey = tonumber(hotkey)
+		end
+		if hotkey == nil then
+			player.print("useful_book-commands.bind-admin-script", RED_COLOR)
+			return
+		end
+
+		local script_name = parameter:sub(1, start_i - 1)
+		script_name = script_name:match'^%s*(.*%S)' -- trim
+		if script_name == nil then
+			player.print("useful_book-commands.bind-admin-script", RED_COLOR)
+			return
+		end
+
+		local f = __compiled_public_hotkey_code[script_name]
+		if f == nil then
+			-- TODO: add localization and improve
+			player.print("There are no such script", RED_COLOR)
+			return
+		end
+
+	-- TODO: add localization
+		local message = "Script has been binded to a hotkey"
+		local bindings = __mod_data.public_script_bindings
+		bindings[player_index] = bindings[player_index] or {}
+		bindings = bindings[player_index]
+		if bindings[hotkey] == nil then
+			bindings[hotkey] = {script_name}
+			player.print(message, GREEN_COLOR)
+			return
+		end
+
+		bindings = bindings[player_index]
+		local is_new = true
+		for _, v in pairs(bindings) do
+			if v == script_name then
+				is_new = false
+				break
+			end
+		end
+
+		if is_new and #bindings < 3 then
+			bindings[#bindings+1] = script_name
+		else
+			-- TODO: add localization
+			player.print("You can't bind more than 3 scripts to a hothey", RED_COLOR)
+			return
+		end
+
+		player.print(message, GREEN_COLOR)
+	end,
 }
 
 return M

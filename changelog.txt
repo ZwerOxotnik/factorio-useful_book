@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.21.2
+Date: 13. 11. 2023
+  Features:
+    - Added new command: /bind-public-script <public script hotkey name> <hotkey number>
+  Bugfixes:
+    - Improved data stability for removed players
+    - Fixed resetting of scripts for hotkeys
+    - Fixed bindings for demoted admins
+---------------------------------------------------------------------------------------------------
 Version: 0.21.1
 Date: 13. 11. 2023
   Changes:
