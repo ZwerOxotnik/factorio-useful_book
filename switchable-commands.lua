@@ -27,7 +27,7 @@ Returns tables of commands without functions as command "settings". All paramete
 ---@type table<string, table>
 return {
 	["Ubook-export"] = {only_for_admin = true, allow_for_server = true},
-	["Ubook-import"] = {only_for_admin = true, allow_for_server = true, is_allowed_empty_args = false},
+	["Ubook-import"] = {only_for_admin = true, allow_for_server = true, is_allowed_empty_args = false, max_input_length = math.huge-1},
 	["Ubook-reset"]  = {only_for_admin = true, allow_for_server = true},
 	["bind-admin-script"] = {only_for_admin = true, allow_for_server = false},
 }

@@ -1,11 +1,18 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.21.1
+Date: 13. 11. 2023
+  Changes:
+    - Added exporting admin/public hotkey scripts
+  Bugfixes:
+    - Fixed importing of scripts (bug from 0.21.0)
+---------------------------------------------------------------------------------------------------
 Version: 0.21.0
 Date: 13. 11. 2023
   Features:
     - Added hotkey scripts (only admin script hotkeys works now)
     - Added new command: /bind-admin-script <admin script hotkey name> <hotkey number> (for example: /bind-admin-script unstuck 1)
   Bugfixes:
-    - Fixed close button in the editor
+    - Fixed closing of the code editor (bug from 0.20.9)
 ---------------------------------------------------------------------------------------------------
 Version: 0.20.9
 Date: 09. 11. 2023

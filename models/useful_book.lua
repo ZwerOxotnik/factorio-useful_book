@@ -284,6 +284,12 @@ function import_scripts(json, player)
 		fix_old_data(data)
 		add_new_command(name, data.descripton, data.code, data.compiler_id, data.version or "0.16.2")
 	end
+	for name, data in pairs(raw_data.public_hotkey_scripts or {}) do
+		add_public_hotkey_script(name, data.descripton, data.code, data.compiler_id, data.version or "0.21.0")
+	end
+	for name, data in pairs(raw_data.admin_hotkey_scripts or {}) do
+		add_admin_hotkey_script(name, data.descripton, data.code, data.compiler_id, data.version or "0.21.0")
+	end
 
 	-- TODO: add localization
 	target.print("Scripts has been imported for \"useful book\"")
@@ -2437,7 +2443,9 @@ M.commands = {
 			admin_area = __admin_area_script_data,
 			rcon = __rcon_script_data,
 			commands = __custom_commands_data,
-			custom_events = __custom_events_data
+			custom_events = __custom_events_data,
+			public_hotkey_scripts = __public_hotkey_script_data,
+			admin_hotkey_scripts  = __admin_hotkey_script_data,
 		}
 
 		local public_data = raw_data.public
