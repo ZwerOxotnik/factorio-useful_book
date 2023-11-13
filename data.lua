@@ -1,4 +1,20 @@
 require("prototypes.style")
+
+
+local inputs = {}
+for i=1, 100 do
+	inputs[#inputs+1] = {
+		type  = "custom-input",
+		name  = "UB_hotkey_" .. i,
+		order = "ZUB_hotkey_" .. string.char(i),
+		localised_name = {"useful_book.hotkey", i},
+		key_sequence = "",
+		action = "lua",
+	}
+end
+data:extend(inputs)
+
+
 local GRAPHICS_PATH = "__useful_book__/graphics/"
 
 data:extend{
