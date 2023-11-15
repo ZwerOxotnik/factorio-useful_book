@@ -3,10 +3,12 @@ local M = {}
 
 local zk_modules = require("__zk-lib__/defines").modules
 
+local luacheck = require(zk_modules.luacheck)
 --#region Compilers
-moonscript = require(zk_modules.moonscript)
-candran    = require(zk_modules.candran)
-tl         = require(zk_modules.tl)
+local moonscript = require(zk_modules.moonscript)
+local candran    = require(zk_modules.candran)
+local tl         = require(zk_modules.tl)
+local lal        = require(zk_modules.lal)
 --#endregion
 
 bitwise    = require(zk_modules.bitwise)
@@ -17,7 +19,6 @@ vivid      = require(zk_modules.vivid)
 guard      = require(zk_modules.guard)
 lpeg       = require(zk_modules.lpeg)
 LCS        = require(zk_modules.LCS)
-lal        = require(zk_modules.lal)
 fun        = require(zk_modules.fun)
 all_control_utils = require(zk_modules.static_libs.all_control_utils)
 Locale  = require(zk_modules.static_libs.locale)
@@ -104,6 +105,55 @@ CLOSE_BUTTON = {
 	sprite = "utility/close_white",
 	hovered_sprite = "utility/close_black",
 	clicked_sprite = "utility/close_black"
+}
+LUACHECK_OPTIONS = {
+	ignore  = {"612", "613", "614", "621"},
+	globals = {
+		"game",
+		"script",
+		"remote",
+		"commands",
+		"settings",
+		"rcon",
+		"rendering",
+		"global",
+		"log",
+		"defines",
+		"data",
+		"mods",
+		"serpent",
+		"table_size",
+		"bit32",
+		"util",
+		"localised_print",
+		"circuit_connector_definitions",
+		"universal_connector_template",
+		"__DebugAdapter",
+		"__Profiler",
+		"bitwise",
+		"luxtre",
+		"vivid",
+		"guard",
+		"lpeg",
+		"LCS",
+		"fun",
+		"all_control_utils",
+		"Locale",
+		"Version",
+		"time_util",
+		"number_util",
+		"coordinates_util",
+		"GuiTemplater",
+		"is_server",
+		"print_to_rcon",
+		"COLON",
+		"FLOW",
+		"LABEL",
+		"EMPTY_WIDGET",
+		"RED_COLOR",
+		"YELLOW_COLOR",
+		"GREEN_COLOR"
+	},
 }
 local BOOK_TYPES  = {
 	admin         = 1,
@@ -432,7 +482,7 @@ function open_import_frame(_, player)
 	local flow = main_frame.add{type = "flow", direction = "horizontal", style = "dialog_buttons_horizontal_flow"}
 	local pusher = flow.add{type = "empty-widget", style = "draggable_space"}
 	pusher.style.horizontally_stretchable = true
-	pusher.style.vertically_stretchable = true
+	pusher.style.vertically_stretchable   = true
 	pusher.drag_target = main_frame
 	local confirm_button = flow.add{
 		type = "button",
@@ -1104,6 +1154,7 @@ function switch_code_editor(player, book_type, id, event_name)
 	content_frame.add({type = "label", name = "error_message", style = "bold_red_label", visible = false})
 
 	local scroll_pane = content_frame.add{type = "scroll-pane", name = "scroll_pane"}
+
 	flow = scroll_pane.add(FLOW)
 	flow.name = "UB_title"
 	local title_label = flow.add(LABEL)
@@ -1154,6 +1205,14 @@ function switch_code_editor(player, book_type, id, event_name)
 	else
 		input.text = data and data.code or DEFAULT_CODE
 	end
+
+	local UB_linter = scroll_pane.add{type = "text-box", name = "UB_linter"}
+	UB_linter.style.horizontally_stretchable = true
+	UB_linter.style.vertically_stretchable   = true
+	UB_linter.style.minimal_height = 120
+	UB_linter.style.maximal_width  = 0
+	UB_linter.read_only = true
+	UB_linter.visible = false
 
 	main_frame.force_auto_center()
 end
@@ -1886,6 +1945,8 @@ local GUIS = {
 	UB_check_code = function(element, player)
 		local flow = element.parent
 		local main_frame = flow.parent
+		local UB_linter = main_frame.scroll_pane.UB_linter
+		---@type string
 		local code = main_frame.scroll_pane.UB_program_input.text
 		local compiler_id = flow.UB_compiler_id.selected_index
 		if compiler_id == COMPILER_IDS.candran then
@@ -1928,7 +1989,46 @@ local GUIS = {
 
 		if code == nil then
 			player.print({"useful_book.empty_code_output_error"}, RED_COLOR)
+			UB_linter.text = ""
+			UB_linter.visible = false
 			return
+		end
+
+		if compiler_id ~= COMPILER_IDS.lua then
+			UB_linter.text = ""
+			UB_linter.visible = false
+		else
+			local report = luacheck.get_report(code)
+			report = luacheck.process_reports({report}, LUACHECK_OPTIONS)
+			if report[1] then
+				local items = {}
+				for i,v in ipairs(report[1]) do
+					local str = luacheck.get_message(v)
+					items[i] = str
+				end
+				if #items > 0 then
+					table.insert(items, 1, "Luacheck: " .. luacheck._VERSION)
+					table.insert(items, 2, "")
+					if report.warnings > 0 then
+						table.insert(items, 2, "Warnings: " .. report.warnings)
+					end
+					if report.errors > 0 then
+						table.insert(items, 2, "Errors: " .. report.errors)
+					end
+					if report.fatals > 0 then
+						table.insert(items, 2, "Fatals: " .. report.fatals)
+					end
+					local message = table.concat(items, "\n")
+					UB_linter.text = message
+					UB_linter.visible = true
+				else
+					UB_linter.text = ""
+					UB_linter.visible = false
+				end
+			else
+				UB_linter.text = ""
+				UB_linter.visible = false
+			end
 		end
 
 		local f = load(code)
@@ -2170,6 +2270,12 @@ M.on_configuration_changed = function(event)
 
 	local old_version = tonumber(string.gmatch(mod_changes.old_version, "%d+.%d+")())
 
+	if old_version < 0.22 then
+		for _, player in pairs(game.players) do
+			-- it's in order to avoid potential bugs
+			destroy_GUI(player)
+		end
+	end
 	if old_version < 0.21 then
 		for _, player in pairs(game.players) do
 			-- it's in order to avoid potential bugs
@@ -2425,14 +2531,22 @@ local DROP_DOWN_GUIS_FUNCS = {
 	end,
 	UB_compiler_id = function(element, player)
 		--TODO: refactor
-		local button = element.parent.parent.buttons_row.UB_run_code
+		local content_frame = element.parent.parent
+		local button = content_frame.buttons_row.UB_run_code
+		local UB_linter = content_frame.scroll_pane.UB_linter
 		if button then
 			button.name = "UB_check_code"
 			button.sprite = "refresh"
 			button.hovered_sprite = ''
 			button.clicked_sprite = ''
-			button = element.parent.parent.buttons_row.UB_add_code
+			button = content_frame.buttons_row.UB_add_code
 			button.visible = false
+		end
+
+		if element.selected_index ~= COMPILER_IDS.lua then
+			UB_linter.visible = false
+		elseif #UB_linter.text > 0 then
+			UB_linter.visible = true
 		end
 	end
 }
