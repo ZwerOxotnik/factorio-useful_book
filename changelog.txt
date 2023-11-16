@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.23.0
+Date: 16. 11. 2023
+  Changes:
+    - You can unbind scripts by repeating the bind commands
+    - Removed some unnecessary files
+    - Changed some icons
+---------------------------------------------------------------------------------------------------
 Version: 0.22.0
 Date: 15. 11. 2023
   Features:

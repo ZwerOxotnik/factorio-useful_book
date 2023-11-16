@@ -1,3 +1,5 @@
+require("util")
+
 ---@class UB : module
 local M = {}
 
@@ -27,7 +29,9 @@ time_util   = require(zk_modules.static_libs.time_util)
 number_util = require(zk_modules.static_libs.number_util)
 coordinates_util = require(zk_modules.static_libs.coordinates_util)
 GuiTemplater = require(zk_modules.static_libs.control_stage.GuiTemplater)
-
+GuiTemplater.buttons.refresh.style = nil
+GuiTemplater.buttons.small_plus = table.deepcopy(GuiTemplater.buttons.plus)
+GuiTemplater.buttons.plus.style = nil
 
 is_server = false -- this is for rcon
 
@@ -1104,13 +1108,11 @@ function switch_code_editor(player, book_type, id, event_name)
 
 	local flow = content_frame.add(FLOW)
 	flow.name = "buttons_row"
-	local content = {type = "sprite-button"}
-	content.name = "UB_check_code"
-	content.sprite = "refresh"
-	flow.add(content)
-	content.name = "UB_add_code"
-	content.sprite = "plus_white"
-	flow.add(content).visible = false
+	local UB_check_code = flow.add(GuiTemplater.buttons.refresh)
+	UB_check_code.name = "UB_check_code"
+	local UB_add_code = flow.add(GuiTemplater.buttons.plus)
+	UB_add_code.name = "UB_add_code"
+	UB_add_code.visible = false
 
 	if book_type == BOOK_TYPES.admin or book_type == BOOK_TYPES.public
 	   or book_type == BOOK_TYPES.public_hotkey or book_type == BOOK_TYPES.admin_hotkey
@@ -1468,7 +1470,7 @@ function switch_book(player, book_type, selected_index)
 	if player.admin then
 		local import = footer.add(GuiTemplater.buttons.import)
 		import.name = "UB_open_import"
-		local plus = footer.add(GuiTemplater.buttons.plus)
+		local plus = footer.add(GuiTemplater.buttons.small_plus)
 		plus.name = "UB_open_code_editor"
 	end
 	footer.add(CLOSE_BUTTON)
@@ -1588,9 +1590,9 @@ function M.on_gui_text_changed(event)
 	local button = element.parent.parent.buttons_row.UB_run_code
 	if button then
 		button.name = "UB_check_code"
-		button.sprite = "refresh"
-		button.hovered_sprite = ''
-		button.clicked_sprite = ''
+		button.sprite = GuiTemplater.buttons.refresh.sprite
+		button.hovered_sprite = GuiTemplater.buttons.refresh.hovered_sprite
+		button.clicked_sprite = GuiTemplater.buttons.refresh.clicked_sprite
 		button = element.parent.parent.buttons_row.UB_add_code
 		button.visible = false
 	end
@@ -1938,9 +1940,9 @@ local GUIS = {
 		error_message.visible = true
 		flow.UB_add_code.visible = false
 		element.name = "UB_check_code"
-		element.sprite = "refresh"
-		element.hovered_sprite = ''
-		element.clicked_sprite = ''
+		element.sprite = GuiTemplater.buttons.refresh.sprite
+		element.hovered_sprite = GuiTemplater.buttons.refresh.hovered_sprite
+		element.clicked_sprite = GuiTemplater.buttons.refresh.clicked_sprite
 	end,
 	UB_check_code = function(element, player)
 		local flow = element.parent
@@ -2536,9 +2538,9 @@ local DROP_DOWN_GUIS_FUNCS = {
 		local UB_linter = content_frame.scroll_pane.UB_linter
 		if button then
 			button.name = "UB_check_code"
-			button.sprite = "refresh"
-			button.hovered_sprite = ''
-			button.clicked_sprite = ''
+			button.sprite = GuiTemplater.buttons.refresh.sprite
+			button.hovered_sprite = GuiTemplater.buttons.refresh.hovered_sprite
+			button.clicked_sprite = GuiTemplater.buttons.refresh.clicked_sprite
 			button = content_frame.buttons_row.UB_add_code
 			button.visible = false
 		end
@@ -2755,18 +2757,16 @@ M.commands = {
 		end
 
 		bindings = bindings[player_index]
-		local is_new = true
-		for _, v in pairs(bindings) do
+		for i, v in pairs(bindings) do
 			if v == script_name then
-				is_new = false
-				break
+				-- TODO: add localization
+				player.print("Script has been unbinded to the hotkey", YELLOW_COLOR)
+				table.remove(bindings, i)
+				return
 			end
 		end
 
-		if is_new then
-			bindings[#bindings+1] = script_name
-		end
-
+		bindings[#bindings+1] = script_name
 		player.print(message, GREEN_COLOR)
 	end,
 	["bind-public-script"] = function(cmd)
@@ -2799,8 +2799,8 @@ M.commands = {
 			return
 		end
 
-	-- TODO: add localization
-		local message = "Script has been binded to a hotkey"
+		-- TODO: add localization
+		local message = "Script has been binded to the hotkey"
 		local bindings = __mod_data.public_script_bindings
 		bindings[player_index] = bindings[player_index] or {}
 		bindings = bindings[player_index]
@@ -2811,15 +2811,16 @@ M.commands = {
 		end
 
 		bindings = bindings[player_index]
-		local is_new = true
-		for _, v in pairs(bindings) do
+		for i, v in pairs(bindings) do
 			if v == script_name then
-				is_new = false
-				break
+				-- TODO: add localization
+				player.print("Script has been unbinded to the hotkey", YELLOW_COLOR)
+				table.remove(bindings, i)
+				return
 			end
 		end
 
-		if is_new and #bindings < 3 then
+		if #bindings < 3 then
 			bindings[#bindings+1] = script_name
 		else
 			-- TODO: add localization
