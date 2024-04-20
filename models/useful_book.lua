@@ -7,7 +7,7 @@ local zk_modules = require("__zk-lib__/defines").modules
 
 local luacheck = require(zk_modules.luacheck)
 --#region Compilers
-local moonscript = require(zk_modules.moonscript)
+-- local moonscript = require(zk_modules.moonscript)-- has been broken
 local candran    = require(zk_modules.candran)
 local tl         = require(zk_modules.tl)
 local lal        = require(zk_modules.lal)
@@ -193,7 +193,7 @@ local COMPILER_NAMES = {
 	[COMPILER_IDS.lua] = "lua",
 	[COMPILER_IDS.candran] = "candran v" .. candran.VERSION,
 	[COMPILER_IDS.teal] = "teal v" .. tl.VERSION,
-	[COMPILER_IDS.moonscript] = "moonscript v" .. moonscript.VERSION
+	[COMPILER_IDS.moonscript] = "[BROKEN] moonscript" -- v" .. moonscript.VERSION
 }
 local EVENTS_NAMES = {}
 for name in pairs(defines.events) do
@@ -731,11 +731,11 @@ function format_command_code(code, compiler_id)
 			code = ""
 		end
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		is_ok, code = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
-		if not is_ok then
-			log(code)
+		-- is_ok, code = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
+		-- if not is_ok then
+		-- 	log(code)
 			code = ""
-		end
+		-- end
 	end
 	local new_code = "local function custom_command(event, player) " .. code .. "\nend\n"
 	-- TODO: improve the error message!
@@ -775,7 +775,8 @@ function add_admin_script(title, description, code, compiler_id, id, version)
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return end
 
@@ -812,7 +813,8 @@ function add_public_script(title, description, code, compiler_id, id, version)
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 
 	if type(f) ~= "function" then return end
@@ -850,7 +852,8 @@ function add_public_hotkey_script(name, description, code, compiler_id, id, vers
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 
 	if type(f) ~= "function" then return end
@@ -883,7 +886,8 @@ function add_admin_hotkey_script(name, description, code, compiler_id, id, versi
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 
 	if type(f) ~= "function" then return end
@@ -915,7 +919,8 @@ function add_admin_area_script(name, description, code, compiler_id, version)
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return false end
 
@@ -946,7 +951,8 @@ function add_rcon_script(name, description, code, compiler_id, version)
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 	if type(f) ~= "function" then return false end
 
@@ -983,7 +989,8 @@ function add_custom_event_script(event_name, name, description, code, compiler_i
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		f = moonscript.loadstring(code)
+		f = function () end
+		-- f = moonscript.loadstring(code)
 	end
 
 	if type(f) ~= "function" then return false end
@@ -1012,7 +1019,7 @@ function add_new_command(name, description, code, compiler_id, version)
 	if compiler_id == COMPILER_IDS.lua then
 		if type(load(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.moonscript then
-		if type(moonscript.loadstring(code)) ~= "function" then return false, false end
+		-- if type(moonscript.loadstring(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.teal then
 		if type(tl.load(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.candran then
@@ -1897,16 +1904,17 @@ local GUIS = {
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.moonscript then
-			local is_ok, lua_code, message = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
-			if not is_ok then
-				player.print(lua_code, RED_COLOR)
-				return
-			end
+			-- local is_ok, lua_code, message = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
+			-- if not is_ok then
+			-- 	player.print(lua_code, RED_COLOR)
+			-- 	return
+			-- end
 
 			if lua_code then
 				code = lua_code
 			else
-				player.print(message, RED_COLOR)
+				player.print("moonscript has been broken", RED_COLOR)
+				-- player.print(message, RED_COLOR)
 				return
 			end
 		end
@@ -1975,16 +1983,17 @@ local GUIS = {
 				return
 			end
 		elseif compiler_id == COMPILER_IDS.moonscript then
-			local is_ok, lua_code, message = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
-			if not is_ok then
-				player.print(lua_code, RED_COLOR)
-				return
-			end
+			-- local is_ok, lua_code, message = pcall(moonscript.to_lua, code) -- TODO: perhaps, xpcall
+			-- if not is_ok then
+			-- 	player.print(lua_code, RED_COLOR)
+			-- 	return
+			-- end
 
 			if lua_code then
 				code = lua_code
 			else
-				player.print(message, RED_COLOR)
+				player.print("moonscript has been broken", RED_COLOR)
+				-- player.print(message, RED_COLOR)
 				return
 			end
 		end
@@ -2151,7 +2160,8 @@ local function compile_script_data(script_data, compiled_script_data)
 		elseif data.compiler_id == COMPILER_IDS.teal then
 			compiled_script_data[id] = tl.load(code)
 		elseif data.compiler_id == COMPILER_IDS.moonscript then
-			compiled_script_data[id] = moonscript.loadstring(code)
+			compiled_script_data[id] = function () end
+			-- compiled_script_data[id] = moonscript.loadstring(code)
 		end
 	end
 end
@@ -2196,7 +2206,8 @@ local function compile_all_text()
 				elseif data.compiler_id == COMPILER_IDS.teal then
 					compiled_N_custom_events[name] = tl.load(code)
 				elseif data.compiler_id == COMPILER_IDS.moonscript then
-					compiled_N_custom_events[name] = moonscript.loadstring(code)
+					compiled_N_custom_events[name] = function () end
+					-- compiled_N_custom_events[name] = moonscript.loadstring(code)
 				end
 			end
 			add_custom_event(event_id)
