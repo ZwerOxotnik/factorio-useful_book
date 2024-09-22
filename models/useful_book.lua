@@ -1956,6 +1956,7 @@ local GUIS = {
 		local flow = element.parent
 		local main_frame = flow.parent
 		local UB_linter = main_frame.scroll_pane.UB_linter
+		local error_message_GUI = main_frame.error_message
 		---@type string
 		local code = main_frame.scroll_pane.UB_program_input.text
 		local compiler_id = flow.UB_compiler_id.selected_index
@@ -2009,8 +2010,18 @@ local GUIS = {
 			UB_linter.text = ""
 			UB_linter.visible = false
 		else
-			local report = luacheck.get_report(code)
-			report = luacheck.process_reports({report}, LUACHECK_OPTIONS)
+			local is_ok, report = pcall(luacheck.get_report, code)
+			if not is_ok then
+				error_message_GUI.caption = "Invalid code or bug (do not report)" -- TODO: add localization
+				error_message_GUI.visible = true
+				return
+			end
+			local is_ok, report = pcall(luacheck.process_reports, {report}, LUACHECK_OPTIONS)
+			if not is_ok then
+				error_message_GUI.caption = "Invalid code or bug (do not report)" -- TODO: add localization
+				error_message_GUI.visible = true
+				return
+			end
 			if report[1] then
 				local items = {}
 				for i,v in ipairs(report[1]) do
@@ -2052,13 +2063,11 @@ local GUIS = {
 				element.clicked_sprite = "utility/lua_snippet_tool_icon"
 			end
 			element.parent.UB_add_code.visible = true
-			local error_message = main_frame.error_message
-			error_message.caption = nil
-			error_message.visible = false
+			error_message_GUI.caption = nil
+			error_message_GUI.visible = false
 		else
-			local error_message = main_frame.error_message
-			error_message.caption = {"useful_book.cant-compile"}
-			error_message.visible = true
+			error_message_GUI.caption = {"useful_book.cant-compile"}
+			error_message_GUI.visible = true
 		end
 	end,
 	UB_import = function(element, player)

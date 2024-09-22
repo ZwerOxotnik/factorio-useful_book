@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.23.3
+Date: 22. 09. 2024
+  Bugfixes:
+    - Fixed crushes with invalid Lua code
+  Locale:
+    - Added Polish translation (thanks to @megalordgier2.0 (megalordgier) on crowdin)
+    - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
+---------------------------------------------------------------------------------------------------
 Version: 0.23.2
 Date: 06. 01. 2024
   Changes:
