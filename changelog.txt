@@ -2,7 +2,7 @@
 Version: 0.23.3
 Date: 22. 09. 2024
   Bugfixes:
-    - Fixed crushes with invalid Lua code
+    - Fixed crashes with invalid Lua code
   Locale:
     - Added Polish translation (thanks to @megalordgier2.0 (megalordgier) on crowdin)
     - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
@@ -73,7 +73,7 @@ Date: 09. 11. 2023
 Version: 0.20.7
 Date: 28. 03. 2023
   Locale:
-    - Probably, fixed a crush when a command was changed
+    - Probably, fixed a crash when a command was changed
   Locale:
     - Updated Russian translation (thanks to @oZeDo on crowdin)
 ---------------------------------------------------------------------------------------------------
@@ -105,7 +105,7 @@ Date: 06. 11. 2022
 Version: 0.20.1
 Date: 04. 11. 2022
   Bugfixes:
-    - Fixed crush when on_runtime_mod_setting_changed event was caused by a script
+    - Fixed crash when on_runtime_mod_setting_changed event was caused by a script
 ---------------------------------------------------------------------------------------------------
 Version: 0.20.0
 Date: 20. 10. 2022
@@ -199,7 +199,7 @@ Date: 23. 08. 2022
 Version: 0.16.2
 Date: 22. 08. 2022
   Bugfixes:
-    - Fixed switching of code editor (it crushed for some scripts)
+    - Fixed switching of code editor (it crashed for some scripts)
   Changes:
     - Saves mod version in export
     - Added new library for scripts (see https://github.com/luafun/luafun ) (access via "fun" variable)
@@ -210,7 +210,7 @@ Date: 22. 08. 2022
 Version: 0.16.1
 Date: 02. 07. 2022
   Bugfixes:
-    - Fixed crushes for old saves with older mod versions (bug from 0.16.0)
+    - Fixed crashes for old saves with older mod versions (bug from 0.16.0)
 ---------------------------------------------------------------------------------------------------
 Version: 0.16.0
 Date: 01. 07. 2022
