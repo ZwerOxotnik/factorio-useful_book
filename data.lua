@@ -7,7 +7,7 @@ for i=1, 100 do
 		type  = "custom-input",
 		name  = "UB_hotkey_" .. i,
 		order = "ZUB_hotkey_" .. string.char(i),
-		localised_name = {"useful_book.hotkey", i},
+		localised_name = {"useful_book.hotkey", tostring(i)},
 		key_sequence = "",
 		action = "lua",
 	}
@@ -33,11 +33,20 @@ data:extend({
 	{
 		type = "selection-tool",
 		name = "UB_admin_area_selection_tool",
-		icons = {
-			{icon = "__useful_book__/graphics/book.png"}
-		},
+		icon = "__useful_book__/graphics/book.png",
 		icon_size = 32,
-		flags = {"hidden", "not-stackable", "only-in-cursor", "spawnable"},
+		flags = {"not-stackable", "only-in-cursor", "spawnable"},
+		select = {
+		  border_color = {1, 1, 1},
+		  mode = {"blueprint"},
+		  cursor_box_type = "copy",
+		},
+		alt_select = {
+		  border_color = {0, 1, 0},
+		  mode = {"blueprint"},
+		  cursor_box_type = "copy",
+		},
+		hidden = true,
 		icon_mipmaps = nil,
 		subgroup = "tool",
 		stack_size = 1,
@@ -55,12 +64,10 @@ data:extend({
 		action = "spawn-item",
 		item_to_spawn = "UB_admin_area_selection_tool",
 		associated_control_input = hotkey_name,
-		icon = {
-			filename = "__useful_book__/graphics/book.png",
-			priority = "low",
-			size = 32,
-			flags = {"gui-icon"}
-		},
+		small_icon = "__useful_book__/graphics/book.png",
+		small_icon_size = 32,
+		icon = "__useful_book__/graphics/book-24x.png",
+		icon_size = 24,
 		toggleable = true,
 		style = "blue"
 	}

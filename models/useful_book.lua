@@ -10,7 +10,7 @@ local luacheck = require(zk_modules.luacheck)
 -- local moonscript = require(zk_modules.moonscript)-- has been broken
 local candran    = require(zk_modules.candran)
 local tl         = require(zk_modules.tl)
-local lal        = require(zk_modules.lal)
+-- local lal        = require(zk_modules.lal)
 --#endregion
 
 bitwise    = require(zk_modules.bitwise)
@@ -79,7 +79,7 @@ local __compiled_custom_events_data = {}
 --#region Constants
 print_to_rcon = rcon.print
 DEFAULT_CODE = "local player = ...\nplayer.print(player.name)"
-DEFAULT_RCON_CODE = "local data = ...\ngame.print(data)\nglobal.my_data = global.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(game.table_to_json(global.my_data))"
+DEFAULT_RCON_CODE = "local data = ...\ngame.print(data)\nglobal.my_data = storage.my_data or {data}\nif not is_server then return end -- be careful with it, it's different value for clients\nrcon.print(helpers.table_to_json(storage.my_data))"
 DEFAULT_ADMIN_AREA_CODE = "local area, player, entities = ...\n"
 DEFAULT_CUSTOM_EVENT_CODE = "local event, player = ...\n"
 DEFAULT_COMMAND_CODE = [[
@@ -106,7 +106,7 @@ CLOSE_BUTTON = {
 	type = "sprite-button",
 	name = "UB_close",
 	style = "frame_action_button",
-	sprite = "utility/close_white",
+	sprite = "utility/close",
 	hovered_sprite = "utility/close_black",
 	clicked_sprite = "utility/close_black"
 }
@@ -318,7 +318,7 @@ end
 -- /sc __useful_book__ getRconData("name")
 ---@param name string
 function getRconData(name)
-	print_to_rcon(game.table_to_json(__mod_data[name]))
+	print_to_rcon(helpers.table_to_json(__mod_data[name]))
 end
 
 -- /sc __useful_book__ RunRCONScript("script name", ...)
@@ -360,7 +360,7 @@ end
 function import_scripts(json, player)
 	local target = player or game
 
-	local raw_data = game.json_to_table(json)
+	local raw_data = helpers.json_to_table(json)
 	if raw_data == nil then
 		-- TODO: add localization
 		target.print("It's not json data")
@@ -579,7 +579,7 @@ function reset_scripts()
 			end\
 		end\
 		local non_infinites = {}\
-		for resource, prototype in pairs(game.get_filtered_entity_prototypes{{filter="type", type="resource"}}) do\
+		for resource, prototype in pairs(prototypes.get_entity_filtered{{filter="type", type="resource"}}) do\
 			if not prototype.infinite_resource then\
 				non_infinites[#non_infinites+1] = resource\
 			end\
@@ -2225,7 +2225,7 @@ local function compile_all_text()
 end
 
 local function link_data()
-	__mod_data = global.useful_book
+	__mod_data = storage.useful_book
 	__public_script_data = __mod_data.public_script_data
 	__admin_script_data  = __mod_data.admin_script_data
 	__admin_area_script_data = __mod_data.admin_area_script_data
@@ -2238,8 +2238,8 @@ local function link_data()
 end
 
 local function update_global_data()
-	global.useful_book = global.useful_book or {}
-	__mod_data = global.useful_book
+	storage.useful_book = storage.useful_book or {}
+	__mod_data = storage.useful_book
 	__mod_data.public_script_data = __mod_data.public_script_data or {}
 	__mod_data.admin_script_data  = __mod_data.admin_script_data  or {}
 	__mod_data.admin_area_script_data = __mod_data.admin_area_script_data or {}
@@ -2718,8 +2718,8 @@ M.commands = {
 		end
 
 		local filename = "useful_book_scripts.json"
-		local json = game.table_to_json(raw_data)
-		game.write_file(filename, json, false, cmd.player_index)
+		local json = helpers.table_to_json(raw_data)
+		helpers.write_file(filename, json, false, cmd.player_index)
 
 		local message = "All scripts has been exported in ...script-output/" .. filename
 		local target
