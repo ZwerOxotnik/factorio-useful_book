@@ -8,7 +8,7 @@ local zk_modules = require("__zk-lib__/defines").modules
 local luacheck = require(zk_modules.luacheck)
 --#region Compilers
 -- local moonscript = require(zk_modules.moonscript)-- has been broken
-local candran    = require(zk_modules.candran)
+-- local candran    = require(zk_modules.candran) -- I have to fin it somehow
 local tl         = require(zk_modules.tl)
 -- local lal        = require(zk_modules.lal)
 --#endregion
@@ -191,7 +191,7 @@ local COMPILER_IDS = {
 }
 local COMPILER_NAMES = {
 	[COMPILER_IDS.lua] = "lua",
-	[COMPILER_IDS.candran] = "candran v" .. candran.VERSION,
+	[COMPILER_IDS.candran] = "candran v?", -- .. candran.VERSION,
 	[COMPILER_IDS.teal] = "teal v" .. tl.VERSION,
 	[COMPILER_IDS.moonscript] = "[BROKEN] moonscript" -- v" .. moonscript.VERSION
 }
@@ -637,21 +637,21 @@ function reset_scripts()
 		"tl.load(event.parameter)()",
 		COMPILER_IDS.lua
 	)
-	add_new_command(
-		"candran", "executes candran code",
-		"if event.parameter == nil then return end\n" ..
-		"if event.player_index == 0 then\n" ..
-		"	load(candran.make(event.parameter))()\n" ..
-		"	return\n" ..
-		"end\n" ..
-		"if not player then return end\n" ..
-		"if not player.admin then\n" ..
-		"	player.print({'prohibited-server-command'})\n" ..
-		"	return\n" ..
-		"end\n" ..
-		"load(candran.make(event.parameter))()",
-		COMPILER_IDS.lua
-	)
+	-- add_new_command(
+	-- 	"candran", "executes candran code",
+	-- 	"if event.parameter == nil then return end\n" ..
+	-- 	"if event.player_index == 0 then\n" ..
+	-- 	"	load(candran.make(event.parameter))()\n" ..
+	-- 	"	return\n" ..
+	-- 	"end\n" ..
+	-- 	"if not player then return end\n" ..
+	-- 	"if not player.admin then\n" ..
+	-- 	"	player.print({'prohibited-server-command'})\n" ..
+	-- 	"	return\n" ..
+	-- 	"end\n" ..
+	-- 	"load(candran.make(event.parameter))()",
+	-- 	COMPILER_IDS.lua
+	-- )
 	for _, player in pairs(game.players) do
 		if player.valid and player.admin then
 			-- TODO: add localization
@@ -719,11 +719,11 @@ DEFAULT_COMMAND_CODE = format_code(DEFAULT_COMMAND_CODE)
 function format_command_code(code, compiler_id)
 	local is_ok
 	if compiler_id == COMPILER_IDS.candran then
-		is_ok, code = pcall(candran.make, code) -- TODO: perhaps, xpcall
-		if not is_ok then
-			log(code)
-			code = ""
-		end
+		-- is_ok, code = pcall(candran.make, code) -- TODO: perhaps, xpcall
+		-- if not is_ok then
+		-- 	log(code)
+		-- 	code = ""
+		-- end
 	elseif compiler_id == COMPILER_IDS.teal then
 		is_ok, code = pcall(tl.gen, code) -- TODO: perhaps, xpcall
 		if not is_ok then
@@ -771,7 +771,7 @@ function add_admin_script(title, description, code, compiler_id, id, version)
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -809,7 +809,7 @@ function add_public_script(title, description, code, compiler_id, id, version)
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -848,7 +848,7 @@ function add_public_hotkey_script(name, description, code, compiler_id, id, vers
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -882,7 +882,7 @@ function add_admin_hotkey_script(name, description, code, compiler_id, id, versi
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -915,7 +915,7 @@ function add_admin_area_script(name, description, code, compiler_id, version)
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -947,7 +947,7 @@ function add_rcon_script(name, description, code, compiler_id, version)
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -985,7 +985,7 @@ function add_custom_event_script(event_name, name, description, code, compiler_i
 	if compiler_id == COMPILER_IDS.lua then
 		f = load(code)
 	elseif compiler_id == COMPILER_IDS.candran then
-		f = load(candran.make(code))
+		-- f = load(candran.make(code))
 	elseif compiler_id == COMPILER_IDS.teal then
 		f = tl.load(code)
 	elseif compiler_id == COMPILER_IDS.moonscript then
@@ -1023,7 +1023,8 @@ function add_new_command(name, description, code, compiler_id, version)
 	elseif compiler_id == COMPILER_IDS.teal then
 		if type(tl.load(code)) ~= "function" then return false, false end
 	elseif compiler_id == COMPILER_IDS.candran then
-		if type(load(candran.make(code))) ~= "function" then return false, false end
+		return false, false
+		-- if type(load(candran.make(code))) ~= "function" then return false, false end
 	end
 
 	__custom_commands_data[name] = {
@@ -1881,13 +1882,16 @@ local GUIS = {
 		local is_ok, _error
 
 		if compiler_id == COMPILER_IDS.candran then
-			local _is_ok, result = pcall(candran.make, code)
-			if _is_ok then
-				code = result
-			else
-				player.print(result, RED_COLOR)
-				return
-			end
+			player.print("candran has been disabled, wait for a fix", RED_COLOR)
+			return
+
+			-- local _is_ok, result = pcall(candran.make, code)
+			-- if _is_ok then
+			-- 	code = result
+			-- else
+			-- 	player.print(result, RED_COLOR)
+			-- 	return
+			-- end
 		elseif compiler_id == COMPILER_IDS.teal then
 			local _is_ok, result = pcall(tl.gen, code)
 			if _is_ok then
@@ -1961,13 +1965,16 @@ local GUIS = {
 		local code = main_frame.scroll_pane.UB_program_input.text
 		local compiler_id = flow.UB_compiler_id.selected_index
 		if compiler_id == COMPILER_IDS.candran then
-			local is_ok, result = pcall(candran.make, code)
-			if is_ok then
-				code = result
-			else
-				player.print(result, RED_COLOR)
-				return
-			end
+			player.print("candran has been disabled, wait for a fix", RED_COLOR)
+			return
+
+			-- local is_ok, result = pcall(candran.make, code)
+			-- if is_ok then
+			-- 	code = result
+			-- else
+			-- 	player.print(result, RED_COLOR)
+			-- 	return
+			-- end
 		elseif compiler_id == COMPILER_IDS.teal then
 			local _is_ok, result = pcall(tl.gen, code)
 			if _is_ok then
@@ -2164,8 +2171,8 @@ local function compile_script_data(script_data, compiled_script_data)
 		if data.compiler_id == COMPILER_IDS.lua then
 			compiled_script_data[id] = load(code)
 		elseif data.compiler_id == COMPILER_IDS.candran then
-			code = candran.make(code)
-			compiled_script_data[id] = load(code)
+			-- code = candran.make(code)
+			-- compiled_script_data[id] = load(code)
 		elseif data.compiler_id == COMPILER_IDS.teal then
 			compiled_script_data[id] = tl.load(code)
 		elseif data.compiler_id == COMPILER_IDS.moonscript then
@@ -2210,8 +2217,8 @@ local function compile_all_text()
 				if data.compiler_id == COMPILER_IDS.lua then
 					compiled_N_custom_events[name] = load(code)
 				elseif data.compiler_id == COMPILER_IDS.candran then
-					code = candran.make(code)
-					compiled_N_custom_events[name] = load(code)
+					-- code = candran.make(code)
+					-- compiled_N_custom_events[name] = load(code)
 				elseif data.compiler_id == COMPILER_IDS.teal then
 					compiled_N_custom_events[name] = tl.load(code)
 				elseif data.compiler_id == COMPILER_IDS.moonscript then
@@ -2341,21 +2348,21 @@ M.on_configuration_changed = function(event)
 			"tl.load(event.parameter)()",
 			COMPILER_IDS.lua
 		)
-		add_new_command(
-			"candran", "executes candran code",
-			"if event.parameter == nil then return end\n" ..
-			"if event.player_index == 0 then\n" ..
-			"	load(candran.make(event.parameter))()\n" ..
-			"	return\n" ..
-			"end\n" ..
-			"if not player then return end\n" ..
-			"if not player.admin then\n" ..
-			"	player.print({'prohibited-server-command'})\n" ..
-			"	return\n" ..
-			"end\n" ..
-			"load(candran.make(event.parameter))()",
-			COMPILER_IDS.lua
-		)
+		-- add_new_command(
+		-- 	"candran", "executes candran code",
+		-- 	"if event.parameter == nil then return end\n" ..
+		-- 	"if event.player_index == 0 then\n" ..
+		-- 	"	load(candran.make(event.parameter))()\n" ..
+		-- 	"	return\n" ..
+		-- 	"end\n" ..
+		-- 	"if not player then return end\n" ..
+		-- 	"if not player.admin then\n" ..
+		-- 	"	player.print({'prohibited-server-command'})\n" ..
+		-- 	"	return\n" ..
+		-- 	"end\n" ..
+		-- 	"load(candran.make(event.parameter))()",
+		-- 	COMPILER_IDS.lua
+		-- )
 	end
 
 	if old_version < 0.18 then
