@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 0.24.0
+Date: 29. 10. 2024
+  Changes:
+    - Updated for Factorio 2.0
+    - Disabled candran (I have to fix it somehow)
+  Locale:
+    - Added Catalan translation (thanks to @badall on crowdin)
+    - Translations: https://crowdin.com/project/factorio-mods-localization (thank you for contributions, I really appreciate it)
+---------------------------------------------------------------------------------------------------
 Version: 0.23.3
 Date: 22. 09. 2024
   Bugfixes:
